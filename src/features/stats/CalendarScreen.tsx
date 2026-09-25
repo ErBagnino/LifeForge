@@ -81,7 +81,7 @@ export default function CalendarScreen() {
                   type="button"
                   disabled={future}
                   onClick={() => setSelected(d)}
-                  className={cx('relative flex aspect-square flex-col items-center justify-center rounded-xl text-[13px] font-semibold', !inMonth && 'opacity-35', d === today && 'ring-2 ring-accent')}
+                  className={cx('hit-44 relative flex aspect-square flex-col items-center justify-center rounded-xl text-[13px] font-semibold', !inMonth && 'opacity-35', d === today && 'ring-2 ring-accent')}
                   style={{ background: future ? 'transparent' : scoreColor(log?.score ?? 0), color: (log?.score ?? 0) > 55 ? 'white' : undefined }}
                   aria-label={`${formatDate(d, 'd MMMM')}${log ? `, score ${log.score}` : ''}`}
                 >

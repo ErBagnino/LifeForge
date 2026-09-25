@@ -36,7 +36,7 @@ export default function ActivitiesAdmin() {
       <TextInput value={q} onChange={setQ} placeholder="Search…" type="search" aria-label="Search activities" className="mt-2" />
       <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4">
         {(['all', 'core', 'important', 'optional', 'paused', 'custom'] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setTier(t)} className={cx('h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold capitalize', tier === t ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
+          <button key={t} type="button" onClick={() => setTier(t)} className={cx('h-11 shrink-0 rounded-full px-3.5 text-[13px] font-semibold capitalize', tier === t ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
             {t === 'optional' ? 'side / pool' : t}
           </button>
         ))}
@@ -44,7 +44,7 @@ export default function ActivitiesAdmin() {
       <div className="mt-3 divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-card">
         {list.map((a) => (
           <div key={a.id} className="flex items-center gap-3 px-3 py-2.5">
-            <button type="button" onClick={() => navigate(`/admin/activities/${a.id}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <button type="button" onClick={() => navigate(`/admin/activities/${a.id}`)} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left">
               <span className={cx('text-[22px]', !a.active && 'opacity-40 grayscale')}>{a.icon}</span>
               <span className="min-w-0 flex-1">
                 <span className={cx('block truncate text-[15px] font-semibold', !a.active && 'text-muted line-through')}>{resolveText(a.name, pet)}</span>

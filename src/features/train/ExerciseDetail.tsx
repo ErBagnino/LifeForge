@@ -149,7 +149,7 @@ function ProgressionRules({ ex, onSaved }: { ex: Exercise; onSaved: () => void }
   const [open, setOpen] = useState(false);
   return (
     <>
-      <SectionTitle action={<button type="button" className="text-[13px] font-semibold text-accent" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Edit'}</button>}>Progression rules</SectionTitle>
+      <SectionTitle action={<button type="button" className="hit-44 text-[13px] font-semibold text-accent" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Edit'}</button>}>Progression rules</SectionTitle>
       {open && (
         <Card className="space-y-3">
           <div className="grid grid-cols-2 gap-2">

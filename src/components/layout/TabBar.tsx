@@ -24,8 +24,8 @@ export function TabBar() {
   const canBuild = useMemo(() => buildings.some((b) => buildBlockers(b, level, coins, buildings).length === 0), [buildings, level, coins]);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 glass border-t border-line" aria-label="Main">
-      <div className="mx-auto flex max-w-[560px] px-1 pb-[var(--safe-bottom)]" style={{ height: 'calc(var(--tabbar-h) + var(--safe-bottom))' }}>
+    <nav className="hide-on-kb fixed inset-x-0 bottom-0 z-40 glass border-t border-line" aria-label="Main">
+      <div className="mx-auto flex max-w-[640px] px-1 pb-[var(--safe-bottom)]" style={{ height: 'calc(var(--tabbar-h) + var(--safe-bottom))' }}>
         {TABS.map((t) => {
           const active = t.to === '/' ? location.pathname === '/' : location.pathname.startsWith(t.to);
           return (

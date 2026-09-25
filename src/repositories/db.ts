@@ -11,6 +11,7 @@ import type {
   Exercise,
   ExerciseState,
   LedgerEntry,
+  Meal,
   MetaEntry,
   MetricEntry,
   NotificationRecord,
@@ -54,6 +55,7 @@ export class LifeForgeDB extends Dexie {
   suggestions!: Table<Suggestion, string>;
   notifications!: Table<NotificationRecord, string>;
   ledger!: Table<LedgerEntry, string>;
+  meals!: Table<Meal, string>;
 
   constructor(name: string = APP_CONFIG.dbName) {
     super(name);
@@ -81,6 +83,11 @@ export class LifeForgeDB extends Dexie {
       suggestions: 'id, key, status, type',
       notifications: 'id, scheduledAt, tag, status',
       ledger: 'id, date, ts',
+    });
+    // v2: meals (food log with optional photo); metrics gain a meal reference.
+    this.version(2).stores({
+      meals: 'id, date, ts',
+      metrics: 'id, date, type, refId, [date+type], [type+date]',
     });
   }
 }
@@ -129,5 +136,6 @@ export const TABLE_NAMES = [
   'suggestions',
   'notifications',
   'ledger',
+  'meals',
 ] as const;
 export type TableName = (typeof TABLE_NAMES)[number];

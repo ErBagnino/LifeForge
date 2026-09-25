@@ -34,11 +34,11 @@ export default function WeeklyReview() {
   return (
     <Screen back title="Weekly review" subtitle={`${formatDate(data.from, 'd MMM')} – ${formatDate(data.to, 'd MMM')} · a new chapter every Monday`}>
       <div className="mt-2 flex justify-between">
-        <button type="button" onClick={() => setAnchor(shiftDate(anchor, -7))} className="flex h-10 items-center gap-1 rounded-full bg-surface px-3 text-[14px] font-semibold shadow-card">
+        <button type="button" onClick={() => setAnchor(shiftDate(anchor, -7))} className="flex h-11 items-center gap-1 rounded-full bg-surface px-3.5 text-[14px] font-semibold shadow-card">
           <Icon name="chevronLeft" size={16} /> Previous
         </button>
         {weekStart(shiftDate(anchor, 7)) <= clock.today() && (
-          <button type="button" onClick={() => setAnchor(shiftDate(anchor, 7))} className="flex h-10 items-center gap-1 rounded-full bg-surface px-3 text-[14px] font-semibold shadow-card">
+          <button type="button" onClick={() => setAnchor(shiftDate(anchor, 7))} className="flex h-11 items-center gap-1 rounded-full bg-surface px-3.5 text-[14px] font-semibold shadow-card">
             Next <Icon name="chevronRight" size={16} />
           </button>
         )}

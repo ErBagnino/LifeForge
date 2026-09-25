@@ -83,7 +83,7 @@ export default function TrainScreen() {
             {featured.exercises.map((te) => {
               const ex = exercises.get(te.exerciseId);
               return (
-                <button key={te.exerciseId} type="button" onClick={() => navigate(`/train/exercise/${te.exerciseId}`)} className="flex w-full items-center justify-between rounded-xl px-1 py-1.5 text-left text-[14px] active:bg-surface-2">
+                <button key={te.exerciseId} type="button" onClick={() => navigate(`/train/exercise/${te.exerciseId}`)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-[14px] active:bg-surface-2">
                   <span className="font-medium">{ex?.name ?? te.exerciseId}</span>
                   <span className="num text-muted">
                     {te.sets} × {te.repMin === te.repMax ? te.repMin : `${te.repMin}–${te.repMax}`}
@@ -148,7 +148,7 @@ export default function TrainScreen() {
 
       {prs.length > 0 && (
         <>
-          <SectionTitle action={<button type="button" className="text-[13px] font-semibold text-accent" onClick={() => navigate('/stats/records')}>All</button>}>Latest PRs</SectionTitle>
+          <SectionTitle action={<button type="button" className="hit-44 text-[13px] font-semibold text-accent" onClick={() => navigate('/stats/records')}>All</button>}>Latest PRs</SectionTitle>
           <div className="grid grid-cols-3 gap-2">
             {prs.map((r) => (
               <Kpi key={r.id} label={r.label.split(' · ')[0]} value={`${r.value} kg`} sub={formatDate(r.date, 'd MMM')} icon="🏆" />

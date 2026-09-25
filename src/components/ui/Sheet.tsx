@@ -73,10 +73,11 @@ export function Sheet({
             aria-labelledby={title ? titleId : undefined}
             tabIndex={-1}
             className={cx(
-              'absolute inset-x-0 bottom-0 mx-auto flex max-w-[560px] flex-col rounded-t-[28px] bg-bg shadow-float outline-none',
-              full ? 'top-[max(12px,var(--safe-top))]' : 'max-h-[92dvh]',
+              'absolute inset-x-0 mx-auto flex max-w-[640px] flex-col rounded-t-[28px] bg-bg shadow-float outline-none',
+              full ? 'top-[max(12px,var(--safe-top))]' : 'max-h-[calc(92dvh-var(--kb))]',
               className,
             )}
+            style={{ bottom: 'var(--kb)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -95,7 +96,7 @@ export function Sheet({
                   <h2 id={titleId} className="min-w-0 flex-1 truncate text-[20px] font-bold">
                     {title}
                   </h2>
-                  <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted">
+                  <button type="button" onClick={onClose} aria-label="Close" className="hit-44 flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted">
                     <Icon name="close" size={18} />
                   </button>
                 </div>

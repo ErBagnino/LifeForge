@@ -36,7 +36,10 @@ The name lives in a single constant (`src/config/app.ts` → `APP_CONFIG.name`),
 
 | Area | Highlights |
 | --- | --- |
-| **Today** | HUD (avatar, level, XP, coins, HP, energy), configurable Today Score 0–100, Next Action card, routines, editable timeline, quick log (steps, water, food, weight, sleep, workout…), rule-based Coach, play-time timer. |
+| **Adapts to your real life** | Nothing is assumed: work hours, wake/bed times, training days and step habits can all be **not set** or **"not sure yet"**, and the app works fine without them. The work schedule supports per-day hours, breaks, partial info ("from 9, end unknown"), variable shifts, versions that start later ("from Monday"), and **one-off days** ("tomorrow 10–20"). A learned **daily capacity** keeps core quests, trims optional ones on full days, and respects "Keep this task", "Keep all" and "Push". |
+| **LifeForge Coach** | A chat that configures the game in Italian or English: "Da lunedì lavoro dalle 8 alle 18", "il mercoledì finisco prima", "questa settimana niente palestra", "da ottobre avrò più tempo", "organizzami la giornata". It asks when something is ambiguous, shows a **preview with today's impact**, and changes nothing until you tap APPLY. It runs **on the device**. Voice input where the browser supports it. An optional AI fallback uses your own API key. |
+| **Today** | HUD (avatar, level, XP, coins, HP, energy), Today Score 0–100, **Day 1 starts small** (3–5 core objectives), Next Action card, collapsible sections (core, routines, important, optional, nutrition, stats), editable timeline, quick log, play-time timer, a "Working today?" prompt shown only when it would change the plan. |
+| **Nutrition** | Calories/macros/water against your targets, meals with photos, 16 quick-add foods with portions, a **food camera** (big Take Photo button, full-width preview), optional AI estimates you review before logging, 7-day charts. |
 | **Quests** | Core / important / side / daily challenge / weekly / boss / hidden. Complete, snooze (30 min · 1 h · tonight · tomorrow), reschedule, skip. Warns you when you keep postponing. Algorithmic side-quest generator (no AI API) that knows the time, your energy, workload and history. |
 | **Train** | Seeded 3-day plan (Mon Upper A · Wed Lower + Core · Fri Upper B, 60–120 s rest). 37 exercises with animated SVG illustrations and front/back muscle maps. Set logging (weight · reps · done · RPE 😎🙂😰💀 · note). A progression engine that *proposes* the next session and waits for your YES/NO, learns from failures, and never auto-applies. Walk → run cardio plan. |
 | **World** | 2D tycoon home with 11 rooms, exponential upgrade prices, world bonuses (income, max energy, XP%), decorations, avatar editor, shop (Streak Freeze, Streak Revive, rerolls, boosters), real-world rewards you approve yourself. |
@@ -46,7 +49,11 @@ The name lives in a single constant (`src/config/app.ts` → `APP_CONFIG.name`),
 | **Personal goals** | Daily **NoFap** core quest with urge-surfing side quests, private discreet notifications and mastery achievements (7 / 30 / 90 / 365 days). **Play-time budget** of 90 min/day (games, TikTok/reels, YouTube, social), tracked with a start/stop timer that survives closing the app. Video calls with your partner never count. |
 
 Content seeded out of the box: **123 activities**, **155 achievements** (16 hidden), **37 exercises**,
-**79 cosmetics**, **11 rooms**, 9 cardio stages, morning/night routines and 8 default smart rules.
+**79 cosmetics**, **11 rooms**, **16 quick-add foods**, 9 cardio stages, morning/night routines and 8 default smart rules.
+
+Designed for **iPhone 15 Pro (393 × 852)** first, and verified with a Playwright audit (`npm run qa`) at 375, 390, 393,
+430, 768 and 1440 px and in landscape: zero horizontal overflow, ≥ 44 px touch targets, safe areas (Dynamic Island, home indicator), keyboard-aware
+chat and sheets, and light/dark themes.
 
 ## Tech stack
 
@@ -83,6 +90,7 @@ npm run dev -- --host   # then open http://<your-computer-ip>:5173 in Safari
 | `npm test` | Vitest: domain engines, services on fake IndexedDB, full game loop. |
 | `npm run check` | typecheck → lint → test → build. Run before every push. |
 | `npm run icons` | Regenerate the PNG icons from `scripts/icon.svg.mjs` (needs Playwright/Chromium). |
+| `npm run qa` | Mobile audit against `npm run preview`: overflow, clipped controls, < 44 px targets, console errors on every route. `W=375 H=812 npm run qa` for other sizes (needs Playwright/Chromium). |
 
 ## Install on iPhone (Add to Home Screen)
 
@@ -161,6 +169,9 @@ and `notificationclick`, so a tap opens the right screen.
 ## Data, backup & privacy
 
 - All data lives in **IndexedDB on your device** (database `lifeforge`). Nothing is sent anywhere, and there's no analytics.
+- **Optional AI:** only if you add your own Anthropic API key (Settings → Coach & AI). Then, and only then, messages
+  the on-device Coach doesn't understand, and food photos you choose to analyze, go directly from your device to
+  Anthropic's API. The key stays in this browser only and is never included in backups.
 - **Settings → Data → Export** downloads a versioned JSON backup; **Import** validates every table against a schema and
   restores atomically (all or nothing).
 - iOS may evict storage from websites you don't use for weeks. Installed Home Screen apps are much safer,
@@ -175,18 +186,20 @@ src/
   types/         domain types (activities, quests, player, workouts, tycoon, settings…)
   utils/         dates (game day with configurable day start), math, ids, formatting
   domain/        pure, tested game engines: XP/levels, rewards, energy, HP, streaks, score,
-                 recurrence, workload, adaptive difficulty, quest generator, achievements,
-                 smart rules, progression, cardio, targets, tycoon, classes, coach, reminders…
+                 recurrence, schedule (work/temporary/exceptions), daily capacity & balancing,
+                 adaptive difficulty, quest generator, achievements, smart rules, progression,
+                 cardio, targets, tycoon, classes, coach lines, Coach language parser (IT/EN)
+                 and assistant, profile field statuses, reminders…
   data/          seed content: activities, achievements, exercises, poses, rooms, cosmetics,
                  routines, quest templates, cardio stages, default rules & settings
   repositories/  the only layer that touches Dexie (activity, quest, workout, stats,
                  achievement, tycoon, settings, notification repositories)
-  services/      use cases (quest/day/workout/tycoon/metrics…), GameTx unit of work,
-                 notifications, export/import, AI import, haptics, clock
+  services/      use cases (quest/day/workout/tycoon/metrics/schedule/coach/food…), GameTx unit
+                 of work, notifications, export/import, AI import, optional Claude client, haptics, clock
   store/         Zustand store + FX event queue
   components/    UI kit, HUD, tab bar, sheets, charts, SVG illustrations, FX layer
-  features/      screens: today, quests, train, world, stats, review, profile, play,
-                 settings, admin, onboarding, search, dev
+  features/      screens: today, quests, train, world, stats, review, profile, play, coach,
+                 nutrition (+ food camera), settings, admin, onboarding, search, dev
   sw.ts          service worker (precache, SPA navigation, push, notification click)
 docs/            architecture, game design, database, progression, future iOS
 ```

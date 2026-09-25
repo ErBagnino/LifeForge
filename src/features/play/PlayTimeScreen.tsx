@@ -84,7 +84,7 @@ export default function PlayTimeScreen() {
               title={`${Math.round(e.value)} min`}
               subtitle={`${LEISURE_KINDS[(e.note as LeisureKind) ?? 'other']?.label ?? 'Manual'} · ${tsToHm(e.ts)}`}
               right={
-                <button type="button" aria-label="Delete session" className="flex h-9 w-9 items-center justify-center rounded-full text-muted" onClick={() => void act(deleteMetric(e))}>
+                <button type="button" aria-label="Delete session" className="flex h-11 w-11 items-center justify-center rounded-full text-muted" onClick={() => void act(deleteMetric(e))}>
                   <Icon name="trash" size={16} />
                 </button>
               }

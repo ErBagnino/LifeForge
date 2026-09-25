@@ -21,7 +21,7 @@ import { useQuestActions } from './useQuestActions';
 const SKIP_REASONS: { value: SkipReason; label: string; icon: string }[] = [
   { value: 'no_time', label: 'No time', icon: '⏳' },
   { value: 'tired', label: 'Too tired', icon: '🥱' },
-  { value: 'not_needed', label: 'Not needed today', icon: '🤷' },
+  { value: 'not_needed', label: 'I don’t want to do it today', icon: '🤷' },
   { value: 'sick', label: 'Sick (no penalty)', icon: '🤒' },
   { value: 'other', label: 'Other', icon: '💬' },
 ];
@@ -129,11 +129,23 @@ function QuestSheetBody({ quest: q, onClose, onMetric }: { quest: Quest; onClose
           {q.metricMode === 'atMost' && <p className="mt-2 text-[12px] text-muted">Budget quest: it is won automatically at the end of the day if you stay under the limit.</p>}
         </Card>
       )}
-      {q.reason && (
-        <p className="mt-3 rounded-2xl bg-surface-2 px-3 py-2 text-[13px] text-muted">
-          <span className="font-semibold text-fg">Why this quest: </span>
-          {q.reason}
-        </p>
+      {q.lightened && pending ? (
+        <div className="mt-3 rounded-2xl bg-surface-2 p-3">
+          <p className="text-[13px] text-muted">
+            <span className="font-semibold text-fg">Lightened today: </span>
+            {q.reason ?? 'Your day is already full, so this became a no-pressure bonus.'}
+          </p>
+          <Button block variant="tinted" icon="check" className="mt-2" onClick={() => close(actions.keep(q))}>
+            Keep this task
+          </Button>
+        </div>
+      ) : (
+        q.reason && (
+          <p className="mt-3 rounded-2xl bg-surface-2 px-3 py-2 text-[13px] text-muted">
+            <span className="font-semibold text-fg">Why this quest: </span>
+            {q.reason}
+          </p>
+        )
       )}
       {warning && pending && (
         <p className={`mt-3 rounded-2xl px-3 py-2 text-[13px] font-semibold ${warning.level === 'alert' ? 'bg-danger/10 text-danger' : 'bg-warn/10 text-warn'}`}>⚠️ {warning.text}</p>

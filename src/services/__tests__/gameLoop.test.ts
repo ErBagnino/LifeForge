@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDbInstance, questRepository, playerRepository, statsRepository, achievementRepository, tycoonRepository, settingsRepository, metaRepository } from '@/repositories';
 import { ensureSeeded } from '../seedService';
 import { beginAdventure, closeDay, ensureToday, setDayType } from '../game/dayService';
-import { completeQuest, loadDay, skipQuest, snoozeQuest, uncompleteQuest } from '../game/questService';
-import { getLeisureTimer, logMetric, startLeisure, stopLeisure } from '../metricsService';
+import { completeQuest, keepQuest, loadDay, skipQuest, snoozeQuest, uncompleteQuest } from '../game/questService';
+import { addWorkSchedule, newSchedule, setTemporaryWork } from '../scheduleService';
+import { planFor } from '../game/dayPlan';
+import { deleteMeal, getLeisureTimer, logMeal, logMetric, startLeisure, stopLeisure } from '../metricsService';
 import { buyCosmetic, buildOrUpgrade } from '../tycoonService';
 import { exportData, importData, validateImport } from '../exportService';
 import { finishSession, startSession, saveSession, decideSuggestion } from '../workoutService';
@@ -12,12 +14,42 @@ import { clock } from '../clock';
 import type { Rpe } from '@/types';
 
 let dbCounter = 0;
-async function freshGame(dateIso = '2026-09-21T10:00:00') {
+/** `veteran` skips the first-week ramp so tests see a full board. */
+async function freshGame(dateIso = '2026-09-21T10:00:00', veteran = true) {
   resetDbInstance(`lifeforge-test-${++dbCounter}`);
   clock.setOffset(new Date(dateIso).getTime() - Date.now());
   await ensureSeeded();
+  if (veteran) await metaRepository.set('adventureStart', '2026-09-01');
   await beginAdventure();
 }
+
+describe('first day experience', () => {
+  it('day 1 starts small: a first quest plus at most 4 core objectives, no important quests', async () => {
+    await freshGame('2026-09-21T10:00:00', false);
+    const { day } = await loadDay(clock.today());
+    const core = day.filter((q) => q.tier === 'core' && q.kind !== 'first');
+    expect(core.length).toBeGreaterThanOrEqual(3);
+    expect(core.length).toBeLessThanOrEqual(4);
+    expect(day.some((q) => q.tier === 'important')).toBe(false);
+    expect(day.some((q) => q.kind === 'first')).toBe(true);
+    // The player's own goals make the cut.
+    expect(core.some((q) => q.activityId === 'nofap')).toBe(true);
+    expect(core.some((q) => q.activityId === 'leisure_limit')).toBe(true);
+    // Monday's workout is offered as a no-pressure bonus.
+    expect(day.find((q) => q.kind === 'workout')?.tier).toBe('optional');
+    const log = await statsRepository.getLog(clock.today());
+    expect(log?.dayIndex).toBe(0);
+  });
+
+  it('works without a work schedule: status not set, no errors, provisional capacity', async () => {
+    await freshGame('2026-09-21T10:00:00', false);
+    const settings = (await settingsRepository.get())!;
+    expect(settings.work.status).toBe('not_set');
+    const log = await statsRepository.getLog(clock.today());
+    expect(log?.workStatus).toBe('unknown');
+    expect(log?.capacityMin).toBeGreaterThan(0);
+  });
+});
 
 describe('game loop (IndexedDB)', () => {
   beforeEach(async () => {
@@ -156,6 +188,20 @@ describe('game loop (IndexedDB)', () => {
     expect((await workoutRepository.states.get('chest_press'))?.workingWeight).toBe(22.5);
   });
 
+  it('meals feed the daily macros and can be deleted cleanly', async () => {
+    const r = await logMeal({ name: 'Lunch', items: [{ name: 'Chicken', kcal: 248, protein: 46, carbs: 0, fat: 5 }, { name: 'Rice', kcal: 350, protein: 7, carbs: 78, fat: 1 }], kcal: 598, protein: 53, carbs: 78, fat: 6, source: 'preset' });
+    expect(r.events).toBeDefined();
+    let log = await statsRepository.getLog(clock.today());
+    expect(log?.metrics).toMatchObject({ calories: 598, protein: 53, carbs: 78, fat: 6 });
+    const [meal] = await statsRepository.mealsByDate(clock.today());
+    expect(meal.items).toHaveLength(2);
+    expect(await statsRepository.metricsByRef(meal.id)).toHaveLength(4);
+    await deleteMeal(meal);
+    log = await statsRepository.getLog(clock.today());
+    expect(log?.metrics.calories ?? 0).toBe(0);
+    expect(await statsRepository.mealsByDate(clock.today())).toHaveLength(0);
+  });
+
   it('tycoon: building is blocked by level and coins', async () => {
     const r = await buildOrUpgrade('gym');
     expect(r.ok).toBe(false);
@@ -172,6 +218,54 @@ describe('game loop (IndexedDB)', () => {
     expect((await playerRepository.get())!.xp).toBe(xp);
     expect(validateImport({ foo: 1 }).ok).toBe(false);
     expect(validateImport({ ...file, data: { ...file.data, player: [{ id: 'nope' }] } }).ok).toBe(false);
+  });
+});
+
+describe('schedules & load control', () => {
+  beforeEach(async () => {
+    await freshGame();
+  });
+
+  it('a temporary schedule changes that day only', async () => {
+    const tomorrow = '2026-09-22';
+    await setTemporaryWork(tomorrow, { kind: 'work', start: '10:00', end: '20:00' });
+    const s = (await settingsRepository.get())!;
+    expect(s.work.status).toBe('not_set');
+    expect((await planFor(tomorrow, s)).work).toEqual({ start: '10:00', end: '20:00', label: 'Work' });
+    expect((await planFor('2026-09-29', s)).workStatus).toBe('unknown');
+  });
+
+  it('a recurring schedule from Monday applies from that date and rebalances today', async () => {
+    await addWorkSchedule(newSchedule(
+      [{ kind: 'off' }, ...Array.from({ length: 5 }, () => ({ kind: 'work' as const, start: '08:00', end: '18:00' })), { kind: 'off' }],
+      '2026-09-21',
+      'coach',
+    ));
+    const s = (await settingsRepository.get())!;
+    expect(s.work.status).toBe('set');
+    const log = await statsRepository.getLog(clock.today());
+    expect(log?.workStatus).toBe('set');
+    expect(log?.freeMin).toBeGreaterThan(0);
+    expect((await planFor('2026-09-26', s)).workStatus).toBe('off');
+  });
+
+  it('"Keep this task" survives a rebalance on a heavy day', async () => {
+    await setTemporaryWork(clock.today(), { kind: 'work', start: '07:00', end: '21:00' });
+    const lightened = (await loadDay(clock.today())).day.find((q) => q.lightened && q.status === 'pending');
+    expect(lightened).toBeDefined();
+    await keepQuest(lightened!.id);
+    await setTemporaryWork(clock.today(), { kind: 'work', start: '07:00', end: '21:30' });
+    const kept = await questRepository.get(lightened!.id);
+    expect(kept).toMatchObject({ kept: true, lightened: false, tier: lightened!.baseTier });
+  });
+
+  it('a free day holds more than a 14-hour workday', async () => {
+    await setTemporaryWork(clock.today(), { kind: 'work', start: '07:00', end: '21:00' });
+    const heavy = (await statsRepository.getLog(clock.today()))!;
+    await setTemporaryWork(clock.today(), { kind: 'off' });
+    const free = (await statsRepository.getLog(clock.today()))!;
+    expect(free.capacityMin!).toBeGreaterThan(heavy.capacityMin!);
+    expect(heavy.workload).toBeGreaterThan(free.workload);
   });
 });
 

@@ -48,7 +48,7 @@ export function ChartCard({
           <div className="text-[15px] font-bold">{title}</div>
           {subtitle && <div className="text-[12px] text-muted">{subtitle}</div>}
         </div>
-        <button type="button" className="text-[12px] font-semibold text-accent" onClick={() => setTable((v) => !v)} aria-pressed={table}>
+        <button type="button" className="hit-44 text-[12px] font-semibold text-accent" onClick={() => setTable((v) => !v)} aria-pressed={table}>
           {table ? 'Chart' : 'Table'}
         </button>
       </div>

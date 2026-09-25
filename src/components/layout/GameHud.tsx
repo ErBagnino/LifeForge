@@ -56,9 +56,14 @@ export function GameHud() {
             {formatInt(into)} / {formatInt(needed)} XP · {Math.round(progress * 100)}%
           </div>
         </div>
-        <button type="button" onClick={() => navigate('/search')} aria-label="Search" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2">
-          <Icon name="search" size={19} />
-        </button>
+        <div className="flex shrink-0 gap-1.5">
+          <button type="button" onClick={() => navigate('/coach')} aria-label="Coach" className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/12 text-accent">
+            <Icon name="chat" size={20} />
+          </button>
+          <button type="button" onClick={() => navigate('/search')} aria-label="Search" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2">
+            <Icon name="search" size={19} />
+          </button>
+        </div>
       </div>
       <div className="mt-3 flex gap-2">
         <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" />
@@ -67,7 +72,7 @@ export function GameHud() {
           <Flame size={16} dim={player.streak.current === 0} />
           <span className="num text-[15px] font-bold">{player.streak.current}</span>
         </div>
-        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="flex items-center gap-1 rounded-2xl bg-surface-2 px-2.5" aria-label={`${player.coins} coins, open shop`}>
+        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex items-center gap-1 rounded-2xl bg-surface-2 px-2.5" aria-label={`${player.coins} coins, open shop`}>
           <span aria-hidden>🪙</span>
           <AnimatedNumber value={player.coins} className="text-[15px] font-bold text-coin" />
         </button>

@@ -26,6 +26,7 @@ export function NextActionCard({ onStart, onOpen }: { onStart: (q: Quest) => voi
       freeMinutes: freeMinutesUntilNextBlock(today.plan, nowMin, settings.dayStartHour),
       inBlock: !!activeBlock(today.plan, nowMin),
       dayType: today.plan.dayType,
+      workKnown: today.plan.workStatus !== 'unknown',
       streakAtRisk: player.streak.current > 0 && (today.log?.score ?? 0) < threshold,
       workloadLevel: today.log?.workloadLevel ?? 'medium',
       dayStartHour: settings.dayStartHour,

@@ -16,7 +16,7 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
         haptics.tap();
         onChange(!checked);
       }}
-      className={cx('relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors', checked ? 'bg-success' : 'bg-surface-3', disabled && 'opacity-40')}
+      className={cx('hit-44 relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors', checked ? 'bg-success' : 'bg-surface-3', disabled && 'opacity-40')}
     >
       <motion.span
         className="absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white shadow"
@@ -55,7 +55,7 @@ export function Segmented<T extends string>({
               haptics.tap();
               onChange(o.value);
             }}
-            className={cx('relative flex-1 rounded-xl font-semibold', size === 'sm' ? 'h-8 text-[13px]' : 'h-9 text-[14px]', active ? 'text-fg' : 'text-muted')}
+            className={cx('hit-44 relative min-w-0 flex-1 rounded-xl font-semibold', size === 'sm' ? 'h-9 text-[13px]' : 'h-10 text-[14px]', active ? 'text-fg' : 'text-muted')}
           >
             {active && <motion.span layoutId={`seg-${id}`} className="absolute inset-0 rounded-xl bg-surface shadow-card" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
             <span className="relative z-10 flex items-center justify-center gap-1 px-1">{o.label}</span>
@@ -86,7 +86,7 @@ export function Stepper({
   size?: 'sm' | 'md';
 }) {
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v * 1000) / 1000));
-  const btn = size === 'sm' ? 'h-9 w-9' : 'h-11 w-11';
+  const btn = size === 'sm' ? 'hit-44 h-9 w-9' : 'h-11 w-11';
   return (
     <div className="flex items-center gap-2" role="group" aria-label={label}>
       <motion.button type="button" whileTap={{ scale: 0.88 }} aria-label={`Decrease ${label}`} className={cx(btn, 'flex items-center justify-center rounded-full bg-surface-2')} onClick={() => { haptics.tap(); onChange(clamp(value - step)); }}>

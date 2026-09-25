@@ -19,22 +19,22 @@ import { formatClock } from '../play/PlayTimeCard';
 
 function NumBox({ value, onChange, step, label, suffix }: { value: number; onChange: (v: number) => void; step: number; label: string; suffix?: string }) {
   return (
-    <div className="flex items-center rounded-xl bg-surface-2" role="group" aria-label={label}>
-      <button type="button" className="flex h-10 w-8 items-center justify-center text-muted" aria-label={`Decrease ${label}`} onClick={() => onChange(Math.max(0, Math.round((value - step) * 100) / 100))}>
+    <div className="flex min-w-0 flex-1 items-center rounded-xl bg-surface-2" role="group" aria-label={label}>
+      <button type="button" className="hit-44 flex h-10 w-7 shrink-0 items-center justify-center text-muted" aria-label={`Decrease ${label}`} onClick={() => onChange(Math.max(0, Math.round((value - step) * 100) / 100))}>
         <Icon name="minus" size={14} />
       </button>
       <input
         inputMode="decimal"
         aria-label={label}
-        className="num h-10 w-12 bg-transparent text-center text-[16px] font-bold outline-none"
+        className="num h-10 w-full min-w-0 flex-1 bg-transparent text-center text-[16px] font-bold outline-none"
         value={Number.isFinite(value) ? value : ''}
         onChange={(e) => {
           const v = parseFloat(e.target.value.replace(',', '.'));
           onChange(Number.isFinite(v) ? v : 0);
         }}
       />
-      {suffix && <span className="-ml-1 pr-0.5 text-[11px] text-muted">{suffix}</span>}
-      <button type="button" className="flex h-10 w-8 items-center justify-center text-muted" aria-label={`Increase ${label}`} onClick={() => onChange(Math.round((value + step) * 100) / 100)}>
+      {suffix && <span className="-ml-1 shrink-0 text-[10px] text-muted">{suffix}</span>}
+      <button type="button" className="hit-44 flex h-10 w-7 shrink-0 items-center justify-center text-muted" aria-label={`Increase ${label}`} onClick={() => onChange(Math.round((value + step) * 100) / 100)}>
         <Icon name="plus" size={14} />
       </button>
     </div>
@@ -47,11 +47,11 @@ function SetRow({ index, set, ex, def, onChange, onComplete }: { index: number; 
   const bodyweight = def?.bodyweight;
   return (
     <div className={cx('rounded-2xl p-2', set.completed ? 'bg-success/10' : 'bg-surface')}>
-      <div className="flex items-center gap-1.5">
-        <span className="num w-6 text-center text-[13px] font-bold text-muted">{index + 1}</span>
+      <div className="flex items-center gap-1">
+        <span className="num w-5 shrink-0 text-center text-[13px] font-bold text-muted">{index + 1}</span>
         {!bodyweight && <NumBox value={set.weight} onChange={(w) => onChange({ ...set, weight: w })} step={def?.progression.increment ?? 2.5} label={`Set ${index + 1} weight`} suffix="kg" />}
         <NumBox value={set.reps} onChange={(r) => onChange({ ...set, reps: Math.round(r) })} step={time ? 5 : 1} label={`Set ${index + 1} ${time ? 'seconds' : 'reps'}`} suffix={time ? 's' : '×'} />
-        <button type="button" className="h-10 min-w-10 rounded-xl bg-surface-2 px-1 text-[20px]" aria-label="Set difficulty" onClick={() => setRpeOpen((v) => !v)}>
+        <button type="button" className="hit-44 h-10 w-10 shrink-0 rounded-xl bg-surface-2 text-[20px]" aria-label="Set difficulty" onClick={() => setRpeOpen((v) => !v)}>
           {set.rpe ? RPE_INFO[set.rpe].emoji : '🙂'}
         </button>
         <motion.button
@@ -67,7 +67,7 @@ function SetRow({ index, set, ex, def, onChange, onComplete }: { index: number; 
               onComplete();
             }
           }}
-          className={cx('ml-auto flex h-10 w-10 items-center justify-center rounded-xl', set.completed ? 'bg-success text-white' : 'border-2 border-line text-faint')}
+          className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', set.completed ? 'bg-success text-white' : 'border-2 border-line text-faint')}
         >
           <Icon name="check" size={20} strokeWidth={3} />
         </motion.button>
@@ -154,7 +154,7 @@ export default function WorkoutLogger() {
     <div className="min-h-full pb-[calc(var(--safe-bottom)+110px)]">
       <div className="sticky top-0 z-20 glass pt-safe">
         <div className="flex h-14 items-center gap-2 px-safe">
-          <button type="button" className="flex h-11 items-center text-[16px] text-accent" onClick={() => setConfirmQuit(true)}>
+          <button type="button" className="-ml-2 flex h-11 w-11 items-center justify-center text-[16px] text-accent" aria-label="Quit workout" onClick={() => setConfirmQuit(true)}>
             <Icon name="close" size={20} />
           </button>
           <div className="min-w-0 flex-1 text-center">

@@ -61,10 +61,31 @@ It's seeded by date, so reopening the app never reshuffles the board. A reroll u
 **Habit learning** (`domain/habits.ts`) is separate: it learns when you actually complete recurring quests and proposes
 moving their planned time (e.g. "you usually read at 22:40, move it from 21:00?"). You accept or dismiss it.
 
-### Workload awareness
-The day's workload (0–100) comes from work hours, busy blocks, planned quests and the workout. A 10-hour workday usually lands
-in "high": you get about 3–5 realistic effortful core quests, and trivial ones (≤ 5 min) are exempt from the cap. Chores
-move to free days, cardio avoids gym days, and side quests shrink to one short option.
+### Daily capacity: maximum consistency, not maximum task count
+Every morning the game estimates how many minutes of quests fit into *today*:
+
+- **What it knows:** awake time (wake/bed, estimated until you set them), work time *if you told it*, busy blocks, the
+  workout, routines.
+- **What it learns:** the share of your free time you actually spend on quests, and the minutes you usually finish on
+  similar days (workdays, free days, days with unknown hours).
+- **Today's state:** energy, recent completion, and "more / less time" periods you set.
+
+Then quests are fitted by priority: **core always stays**, important quests fill the remaining room by importance,
+and whatever doesn't fit becomes a **no-pressure bonus** (never deleted). Core is only lightened when core alone
+overflows the day by 20%+, and never below 3 effortful core quests. Side quests are sized to what's left. Example:
+a 10-hour workday leaves room for a few realistic quests, a free day gets more, and 6 hours of work plus a workout
+lands in between.
+
+**You stay in control:** "Keep this task" on any lightened quest, "Skip today" / "I don't want to do it today", and
+a load mode per day, per week or always: **Balance** (default), **Keep all** (nothing trimmed) or **Push** (nothing
+trimmed plus extra side quests). Safety limits still apply.
+
+### Missing information is not an error
+Work schedule, wake/bed times, training days, daily steps and future goals can all be **not set** or **"not sure
+yet"**. The profile shows each field as SET / NOT SET / OPTIONAL. Without work hours, days are planned from your
+energy and history. Without training days, the plan is flexible: 3 sessions a week, never two days in a row. Without
+a step estimate, the target calibrates from your first logged days. The game asks only when an answer would change the
+plan (e.g. a "Working today?" card on mornings with unknown hours, never on Day 1).
 
 ### Adaptive difficulty
 Every morning the game classifies you as **too easy / balanced / overloaded / critical** from recent completion rate,
@@ -72,6 +93,20 @@ workload, energy and HP. It then adjusts side quests and the challenge, and on b
 lower-priority quests to optional. *Too easy* adds 2 side quests, allows longer ones and rolls rarer challenges.
 *Overloaded* keeps one short side quest, and *critical* removes them and the challenge. It never raises real-world
 targets automatically (see *Safety*).
+
+### Day 1 and progressive complexity
+Onboarding asks 7 short things (name, height, weight, main goals, workout availability, daily habits, work schedule
+with **I don't know yet / I'll add it**). All but the name can be skipped. **Day 1 starts small**: the first quest plus
+up to 4 core objectives, chosen by your own goals first (NoFap, play-time budget), then quick important habits. There
+are no important quests, no challenge and at most 2 side quests. Days 2–3 add a few quests and routines, days 4–7
+more, and from week 2 the full board and adaptive system run. Feature unlocks by level still apply on top.
+
+### The Coach
+A chat that updates the game from plain sentences, in Italian or English: new or changed work hours, one-off days,
+days off, no-gym weeks, more/less free time, focus goals, wake/bed times, weight, steps, "plan my day". It
+understands partial info ("probably from 9" means start 09:00, end unknown), asks when something is ambiguous, and
+always shows a **preview** (including the effect on today's load) before anything changes. You can adjust assumed
+days in the preview, then APPLY or "keep as is".
 
 ## 3. Today Score (0–100)
 
@@ -208,3 +243,7 @@ a "cheat day" or as compensation for training.
    ~175 g carbs, 2–2.5 L water) are editable settings, and the UI says so.
 4. **Penalties are capped and game-only**, with Recovery Mode instead of game over.
 5. **Rest is part of the game.** Rest days and sick days are first-class, and recovery activities restore energy and HP.
+6. **No assumptions about your life.** No invented work hours, no assumed free weekends, no guessed end times. The
+   Coach and the planner use only what you said, and ask when it matters.
+7. **Food logging is neutral.** Photos and estimates are for awareness. There are no "bad meal" messages, and the
+   AI estimate prompt forbids suggesting skipped meals or compensation.

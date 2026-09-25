@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "LIFEFORGE — a personal life tycoon / RPG. Your real life is the game.",
+  "description": "LIFEFORGE \u2014 a personal life tycoon / RPG. Your real life is the game.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/generate-icons.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "qa": "node scripts/qa/audit.cjs"
   },
   "engines": {
     "node": ">=20"

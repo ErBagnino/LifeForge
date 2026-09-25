@@ -13,6 +13,8 @@ export interface NextActionContext {
   streakAtRisk: boolean;
   workloadLevel: WorkloadLevel;
   dayStartHour: number;
+  /** False when today's work hours are unknown: no "free day" assumptions. */
+  workKnown?: boolean;
 }
 
 export interface NextAction {
@@ -48,7 +50,7 @@ export function rankActions(quests: Quest[], ctx: NextActionContext): NextAction
       if (q.scheduledTime) {
         const diff = gameMinutes(q.scheduledTime, ctx.dayStartHour) - now;
         if (diff < 0) {
-          const bonus = 20 + Math.min(20, -diff / 15);
+          const bonus = (20 + Math.min(20, -diff / 15)) * (q.tier === 'optional' ? 0.5 : 1);
           score += bonus;
           reasons.push({ text: `Planned for ${q.scheduledTime} — it's waiting`, weight: bonus });
         } else if (diff <= 60) {
@@ -75,7 +77,7 @@ export function rankActions(quests: Quest[], ctx: NextActionContext): NextAction
         score += 8;
         reasons.push({ text: 'Heavy day: quick win first', weight: 8 });
       }
-      if (ctx.dayType === 'free' && q.kind === 'workout') {
+      if (ctx.dayType === 'free' && ctx.workKnown !== false && q.kind === 'workout') {
         score += 10;
         reasons.push({ text: 'Free day — perfect time to train', weight: 10 });
       }

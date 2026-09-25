@@ -10,7 +10,7 @@ import {
   statsRepository,
   withTransaction,
 } from '@/repositories';
-import type { ISODate, LeisureKind, MetricEntry, MetricSource, MetricType, Quest } from '@/types';
+import type { ISODate, LeisureKind, Meal, MetricEntry, MetricSource, MetricType, Quest } from '@/types';
 import { dateTimeToTs, gameDate, shiftDate, weekEnd, weekStart } from '@/utils/date';
 import { uid } from '@/utils/id';
 import { clock } from './clock';
@@ -63,6 +63,7 @@ export interface LogMetricOptions {
   mode?: 'add' | 'set';
   note?: string;
   source?: MetricSource;
+  refId?: string;
 }
 
 export function logMetric(type: MetricType, value: number, opts: LogMetricOptions = {}): Promise<QuestResult> {
@@ -73,7 +74,7 @@ export function logMetric(type: MetricType, value: number, opts: LogMetricOption
     const before = aggregateMetrics(await statsRepository.metricsByDate(date));
     const prevValue = before[type] ?? 0;
     const entryValue = mode === 'set' && (type === 'water' || type === 'calories' || type === 'protein' || type === 'carbs' || type === 'fat' || type === 'leisure' || type === 'distance') ? value - prevValue : value;
-    const entry: MetricEntry = { id: uid('m_'), date, type, value: entryValue, ts: tx.now, note: opts.note, source: opts.source ?? 'manual' };
+    const entry: MetricEntry = { id: uid('m_'), date, type, value: entryValue, ts: tx.now, note: opts.note, source: opts.source ?? 'manual', refId: opts.refId };
     await statsRepository.addMetric(entry);
     const after = aggregateMetrics(await statsRepository.metricsByDate(date));
     const nextValue = after[type] ?? 0;
@@ -196,4 +197,39 @@ export async function stopLeisure(): Promise<QuestResult & { minutes: number }> 
     features: results.flatMap((r) => r.features),
     minutes: Math.round(first + second),
   };
+}
+
+// ——— Meals ———
+
+export type MealInput = Omit<Meal, 'id' | 'ts' | 'date'> & { date?: ISODate };
+
+const MACROS: [MetricType, keyof Pick<Meal, 'kcal' | 'protein' | 'carbs' | 'fat'>][] = [
+  ['calories', 'kcal'],
+  ['protein', 'protein'],
+  ['carbs', 'carbs'],
+  ['fat', 'fat'],
+];
+
+/** Log a meal: stored with its items/photo, and its macros feed the daily metrics (and quests). */
+export async function logMeal(input: MealInput): Promise<QuestResult> {
+  const date = input.date ?? clock.today();
+  const meal: Meal = { ...input, id: uid('meal_'), ts: clock.now(), date };
+  await statsRepository.putMeal(meal);
+  const events: QuestResult['events'] = [];
+  const features: string[] = [];
+  for (const [type, key] of MACROS) {
+    const v = Math.round(meal[key]);
+    if (v <= 0) continue;
+    const r = await logMetric(type, v, { date, mode: 'add', note: meal.name, refId: meal.id });
+    events.push(...r.events);
+    features.push(...r.features);
+  }
+  return { events, features };
+}
+
+export async function deleteMeal(meal: Meal): Promise<QuestResult> {
+  const events: QuestResult['events'] = [];
+  for (const m of await statsRepository.metricsByRef(meal.id)) events.push(...(await deleteMetric(m)).events);
+  await statsRepository.removeMeal(meal.id);
+  return { events, features: [] };
 }

@@ -56,7 +56,7 @@ export default function PlanEditor() {
         <div key={t.id}>
           <SectionTitle
             action={
-              <button type="button" className="text-[13px] font-semibold text-danger" onClick={() => setPlan({ ...plan, templates: plan.templates.filter((_, j) => j !== ti) })}>
+              <button type="button" className="hit-44 text-[13px] font-semibold text-danger" onClick={() => setPlan({ ...plan, templates: plan.templates.filter((_, j) => j !== ti) })}>
                 Remove day
               </button>
             }
@@ -80,28 +80,28 @@ export default function PlanEditor() {
                 <div key={`${te.exerciseId}${ei}`} className="py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="flex-1 truncate text-[15px] font-semibold">{exName(te.exerciseId)}</span>
-                    <button type="button" aria-label="Move up" className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2" onClick={() => move(ti, ei, -1)}>
+                    <button type="button" aria-label="Move up" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2" onClick={() => move(ti, ei, -1)}>
                       ↑
                     </button>
-                    <button type="button" aria-label="Move down" className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2" onClick={() => move(ti, ei, 1)}>
+                    <button type="button" aria-label="Move down" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2" onClick={() => move(ti, ei, 1)}>
                       ↓
                     </button>
-                    <button type="button" aria-label="Remove exercise" className="flex h-9 w-9 items-center justify-center rounded-full bg-danger/10 text-danger" onClick={() => setTemplate(ti, { ...t, exercises: t.exercises.filter((_, j) => j !== ei) })}>
+                    <button type="button" aria-label="Remove exercise" className="flex h-11 w-11 items-center justify-center rounded-full bg-danger/10 text-danger" onClick={() => setTemplate(ti, { ...t, exercises: t.exercises.filter((_, j) => j !== ei) })}>
                       <Icon name="trash" size={15} />
                     </button>
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-1.5">
                     <Field label="Sets">
-                      <NumberInput value={te.sets} onChange={(v) => setExercise(ti, ei, { ...te, sets: Math.max(1, Math.round(v)) })} aria-label="Sets" className="!h-10 !px-2" />
+                      <NumberInput value={te.sets} onChange={(v) => setExercise(ti, ei, { ...te, sets: Math.max(1, Math.round(v)) })} aria-label="Sets" className="!h-11 !px-2" />
                     </Field>
                     <Field label="Min">
-                      <NumberInput value={te.repMin} onChange={(v) => setExercise(ti, ei, { ...te, repMin: Math.max(1, Math.round(v)) })} aria-label="Min reps" className="!h-10 !px-2" />
+                      <NumberInput value={te.repMin} onChange={(v) => setExercise(ti, ei, { ...te, repMin: Math.max(1, Math.round(v)) })} aria-label="Min reps" className="!h-11 !px-2" />
                     </Field>
                     <Field label="Max">
-                      <NumberInput value={te.repMax} onChange={(v) => setExercise(ti, ei, { ...te, repMax: Math.max(te.repMin, Math.round(v)) })} aria-label="Max reps" className="!h-10 !px-2" />
+                      <NumberInput value={te.repMax} onChange={(v) => setExercise(ti, ei, { ...te, repMax: Math.max(te.repMin, Math.round(v)) })} aria-label="Max reps" className="!h-11 !px-2" />
                     </Field>
                     <Field label="Rest s">
-                      <NumberInput value={te.restSec} onChange={(v) => setExercise(ti, ei, { ...te, restSec: Math.max(0, Math.round(v)) })} aria-label="Rest seconds" className="!h-10 !px-2" />
+                      <NumberInput value={te.restSec} onChange={(v) => setExercise(ti, ei, { ...te, restSec: Math.max(0, Math.round(v)) })} aria-label="Rest seconds" className="!h-11 !px-2" />
                     </Field>
                   </div>
                 </div>

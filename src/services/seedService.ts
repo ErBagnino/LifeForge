@@ -59,6 +59,7 @@ async function mergeMissing<T extends { id: string }>(
 
 /** Create or upgrade seed content. Returns true on the very first run. */
 export async function ensureSeeded(): Promise<{ firstRun: boolean }> {
+  await settingsRepository.migrate();
   const version = await metaRepository.get<number>('seedVersion');
   if (version === SEED_VERSION) return { firstRun: false };
   const firstRun = version === undefined;

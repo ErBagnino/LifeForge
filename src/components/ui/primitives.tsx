@@ -55,7 +55,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   tinted: 'bg-accent/12 text-accent',
 };
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3.5 text-[14px] rounded-xl gap-1.5',
+  sm: 'hit-44 h-10 px-3.5 text-[14px] rounded-xl gap-1.5',
   md: 'h-11 px-4 text-[15px] rounded-2xl gap-2',
   lg: 'h-14 px-5 text-[17px] rounded-2xl gap-2',
 };

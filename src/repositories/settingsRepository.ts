@@ -1,10 +1,12 @@
 import type { MetaEntry, Player, Settings, Suggestion, SuggestionStatus } from '@/types';
-import { normalizeSettings } from '@/data/defaultSettings';
+import { normalizeSettings, SETTINGS_SCHEMA_VERSION } from '@/data/defaultSettings';
 import { getDb } from './db';
 
 export interface SettingsRepository {
   get(): Promise<Settings | undefined>;
   save(settings: Settings): Promise<void>;
+  /** Persist one-time settings migrations. Returns true when something was migrated. */
+  migrate(): Promise<boolean>;
 }
 
 export const settingsRepository: SettingsRepository = {
@@ -14,6 +16,12 @@ export const settingsRepository: SettingsRepository = {
   },
   save: async (s) => {
     await getDb().settings.put({ ...s, updatedAt: Date.now() });
+  },
+  migrate: async () => {
+    const raw = await getDb().settings.get('settings');
+    if (!raw || (raw.schemaVersion ?? 1) >= SETTINGS_SCHEMA_VERSION) return false;
+    await getDb().settings.put({ ...normalizeSettings(raw), updatedAt: Date.now() });
+    return true;
   },
 };
 

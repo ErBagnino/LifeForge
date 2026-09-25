@@ -26,7 +26,7 @@ const SECTIONS: { key: keyof Omit<GameRules, 'smartRules'>; title: string; help:
 ];
 
 function Editor({ value, onChange, path = '' }: { value: Json; onChange: (v: Json) => void; path?: string }) {
-  if (typeof value === 'number') return <NumberInput value={value} onChange={(v) => onChange(v)} step={Number.isInteger(value) ? 1 : 0.01} aria-label={path} className="!h-10" />;
+  if (typeof value === 'number') return <NumberInput value={value} onChange={(v) => onChange(v)} step={Number.isInteger(value) ? 1 : 0.01} aria-label={path} className="!h-11" />;
   if (typeof value === 'boolean') return <Toggle checked={value} onChange={onChange} label={path} />;
   if (Array.isArray(value)) {
     return (
@@ -79,7 +79,7 @@ export default function RulesEditor() {
     <Screen back title="Game rules" subtitle="The whole game is data. Tweak carefully — or reset to defaults.">
       {SECTIONS.map((s) => (
         <div key={s.key}>
-          <SectionTitle action={<button type="button" className="text-[13px] font-semibold text-accent" onClick={() => setOpen(open === s.key ? null : s.key)}>{open === s.key ? 'Close' : 'Edit'}</button>}>
+          <SectionTitle action={<button type="button" className="hit-44 text-[13px] font-semibold text-accent" onClick={() => setOpen(open === s.key ? null : s.key)}>{open === s.key ? 'Close' : 'Edit'}</button>}>
             {s.title}
           </SectionTitle>
           {open === s.key && (
@@ -108,12 +108,12 @@ export default function RulesEditor() {
             <div className="mt-2 space-y-1.5">
               {r.conditions.map((c, ci) => (
                 <div key={ci} className="grid grid-cols-[1fr_64px_80px] gap-1.5">
-                  <Select value={c.fact} onChange={(v) => setCondition(ri, ci, { ...c, fact: v })} options={Object.entries(FACT_CATALOG).map(([k, f]) => ({ value: k, label: f.label }))} aria-label="Fact" className="!h-10 !text-[13px]" />
-                  <Select value={c.op} onChange={(v) => setCondition(ri, ci, { ...c, op: v })} options={Object.entries(OPERATOR_LABELS).map(([k, l]) => ({ value: k as RuleCondition['op'], label: l }))} aria-label="Operator" className="!h-10" />
+                  <Select value={c.fact} onChange={(v) => setCondition(ri, ci, { ...c, fact: v })} options={Object.entries(FACT_CATALOG).map(([k, f]) => ({ value: k, label: f.label }))} aria-label="Fact" className="!h-11 !text-[13px]" />
+                  <Select value={c.op} onChange={(v) => setCondition(ri, ci, { ...c, op: v })} options={Object.entries(OPERATOR_LABELS).map(([k, l]) => ({ value: k as RuleCondition['op'], label: l }))} aria-label="Operator" className="!h-11" />
                   {typeof c.value === 'boolean' ? (
-                    <Select value={String(c.value)} onChange={(v) => setCondition(ri, ci, { ...c, value: v === 'true' })} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} aria-label="Value" className="!h-10" />
+                    <Select value={String(c.value)} onChange={(v) => setCondition(ri, ci, { ...c, value: v === 'true' })} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} aria-label="Value" className="!h-11" />
                   ) : (
-                    <NumberInput value={Number(c.value)} onChange={(v) => setCondition(ri, ci, { ...c, value: v })} step={0.1} aria-label="Value" className="!h-10 !px-2" />
+                    <NumberInput value={Number(c.value)} onChange={(v) => setCondition(ri, ci, { ...c, value: v })} step={0.1} aria-label="Value" className="!h-11 !px-2" />
                   )}
                 </div>
               ))}

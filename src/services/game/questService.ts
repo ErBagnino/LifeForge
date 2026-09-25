@@ -274,6 +274,18 @@ export function skipQuest(id: ID, reason: SkipReason): Promise<QuestResult> {
   });
 }
 
+/** "Keep this task": undo a lightening and protect the quest from future balancing today. */
+export function keepQuest(id: ID): Promise<QuestResult> {
+  return run(async (tx) => {
+    const q = await mustGet(id);
+    const tier = q.baseTier ?? q.tier;
+    const next: Quest = { ...q, tier, kept: true, lightened: false, reason: 'You chose to keep this one. Respect.', updatedAt: tx.now };
+    await questRepository.put(next);
+    await settleDay(tx);
+    return next;
+  });
+}
+
 export function failQuest(id: ID): Promise<QuestResult> {
   return run(async (tx) => {
     const q = await mustGet(id);

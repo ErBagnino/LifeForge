@@ -1,5 +1,7 @@
 import { DEFAULT_CARDIO_STAGES } from '@/data/cardio';
-import { coreCap, computeDifficultyState, importantCap, selectDemotions, sideQuestBudget } from '@/domain/adaptive';
+import { computeDifficultyState, sideQuestBudget } from '@/domain/adaptive';
+import { type RampLimits, rampLimits } from '@/domain/capacity';
+import { applyWorkToPlan, gymBlocked, resolveWork } from '@/domain/schedule';
 import { countersForDayClose, C } from '@/domain/counters';
 import { closeDay as closeDayDomain, weeklyStreakTarget } from '@/domain/dayClose';
 import { startingEnergy } from '@/domain/energy';
@@ -7,7 +9,6 @@ import { learnTimes } from '@/domain/habits';
 import { FEATURE_LEVELS } from '@/domain/level';
 import { daysLeftInWeek, isDueOn } from '@/domain/recurrence';
 import { applyWeekToStreak } from '@/domain/streak';
-import { computeWorkload, dayCapacity } from '@/domain/workload';
 import { evaluateRules } from '@/domain/rulesEngine';
 import {
   activityRepository,
@@ -20,7 +21,7 @@ import {
   withTransaction,
   workoutRepository,
 } from '@/repositories';
-import type { DayLog, DayPlan, DayType, ISODate, Quest, Settings } from '@/types';
+import type { Activity, DayLog, DayPlan, DayType, ISODate, Quest, Settings } from '@/types';
 import { dateRange, daysBetween, hmToMinutes, isWeekend, minutesToHm, shiftDate, weekday, weekKey, weekStart } from '@/utils/date';
 import { clock } from '../clock';
 import type { ServiceResult } from '../events';
@@ -30,6 +31,7 @@ import { generateChallenge, generateHidden, generateLongQuests, generateSideQues
 import { type FactoryContext, firstQuest, questFromActivity, workoutQuest } from './questFactory';
 import { applyCompletion, loadDay, runRules, settleDay } from './questService';
 import { refreshLog, scoreDay } from './scoring';
+import { adventureDay, applyDecisions, capacityHistory, computeDayLoad } from './load';
 
 const MAX_GAP_DAYS = 45;
 let rolloverLock: Promise<ServiceResult> | null = null;
@@ -75,7 +77,35 @@ async function learnedWorkoutTime(date: ISODate): Promise<number | undefined> {
 
 function defaultWorkoutTime(plan: DayPlan): string {
   if (plan.dayType === 'work' && plan.work) return minutesToHm(hmToMinutes(plan.work.end) + 30);
+  if (plan.workEnd) return minutesToHm(hmToMinutes(plan.workEnd) + 30);
+  // Unknown or open-ended work: suggest early evening, the player can move it.
+  if (plan.workStatus === 'unknown' || plan.workStatus === 'partial') return '18:30';
   return '11:00';
+}
+
+/** Rank core quests for the first days: the player's own goals first, then quick, important ones. */
+function rampScore(q: Quest, activities: Activity[]): number {
+  const a = activities.find((x) => x.id === q.activityId);
+  const goal = a?.tags?.includes('nofap') || q.metric === 'leisure' ? 100 : 0;
+  return goal + (a?.importance ?? 3) * 10 + (q.durationMin <= 5 ? 8 : 0) - q.durationMin / 5;
+}
+
+/** Trim a new board to the first-week limits (quests are simply not created yet). */
+export function applyRamp(created: Quest[], ramp: RampLimits, activities: Activity[], dayIndex: number, existing: Quest[] = []): void {
+  const keep = new Set<string>();
+  const byScore = (list: Quest[]) => [...list].sort((a, b) => rampScore(b, activities) - rampScore(a, activities));
+  const had = (tier: Quest['tier']) => existing.filter((q) => q.kind === 'scheduled' && (q.baseTier ?? q.tier) === tier).length;
+  byScore(created.filter((q) => q.kind === 'scheduled' && q.tier === 'core')).slice(0, Math.max(0, ramp.core - had('core'))).forEach((q) => keep.add(q.id));
+  byScore(created.filter((q) => q.kind === 'scheduled' && q.tier === 'important')).slice(0, Math.max(0, ramp.important - had('important'))).forEach((q) => keep.add(q.id));
+  if (ramp.routines) created.filter((q) => q.kind === 'scheduled' && q.tier === 'optional').forEach((q) => keep.add(q.id));
+  for (let i = created.length - 1; i >= 0; i--) {
+    const q = created[i];
+    if (q.kind === 'workout') {
+      if (dayIndex === 0) Object.assign(q, { tier: 'optional' as const, reason: 'Day 1 bonus: start whenever you feel ready.' });
+      continue;
+    }
+    if (q.kind === 'scheduled' && !keep.has(q.id)) created.splice(i, 1);
+  }
 }
 
 /** Build today's quest board: scheduled, workout, adaptive side quests, challenge, hidden, weekly, boss. */
@@ -108,9 +138,20 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
 
     // Workout from the active plan (decided first: cardio avoids strength days)
     const workoutPlan = await workoutRepository.activePlan();
-    const template = workoutPlan?.templates.find((t) => t.weekday === weekday(date));
-    const workoutToday = !!template && !restDay;
-    const freeDaysLeftAfterToday = Array.from({ length: daysLeftInWeek(date) - 1 }, (_, i) => weekday(shiftDate(date, i + 1))).filter((d) => settings.schedule.days[d].type === 'free').length;
+    const gymOff = gymBlocked(settings, date);
+    const fixedTemplate = workoutPlan?.templates.find((t) => t.weekday === weekday(date));
+    const flexible = !!workoutPlan && (settings.known.training === 'unknown' || workoutPlan.templates.every((t) => t.weekday === null || t.weekday === undefined));
+    const workoutsThisWeek = history.filter((q) => q.kind === 'workout' && q.status === 'completed' && q.date >= ws);
+    const trainedYesterday = history.some((q) => q.kind === 'workout' && q.status === 'completed' && q.date === shiftDate(date, -1));
+    let template = fixedTemplate;
+    if (!template && flexible && workoutPlan && !trainedYesterday && workoutsThisWeek.length < workoutPlan.templates.length) {
+      // Flexible plan: rotate through the templates, one session whenever the day allows it.
+      const lastDone = history.filter((q) => q.kind === 'workout' && q.status === 'completed').sort((a, b) => b.date.localeCompare(a.date))[0];
+      const lastIdx = workoutPlan.templates.findIndex((t) => t.id === lastDone?.workoutTemplateId);
+      template = workoutPlan.templates[(lastIdx + 1) % workoutPlan.templates.length];
+    }
+    const workoutToday = !!template && !restDay && !gymOff;
+    const freeDaysLeftAfterToday = Array.from({ length: daysLeftInWeek(date) - 1 }, (_, i) => shiftDate(date, i + 1)).filter((d) => resolveWork(d, settings.work).status === 'off').length;
 
     // Scheduled activities
     for (const a of activities) {
@@ -134,19 +175,22 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
 
     if (template && workoutToday && !existing.day.some((q) => q.kind === 'workout')) {
       const learned = await learnedWorkoutTime(date);
-      created.push(workoutQuest(template, ctx, learned !== undefined ? minutesToHm(Math.round(learned / 15) * 15) : defaultWorkoutTime(plan)));
+      const wq = workoutQuest(template, ctx, learned !== undefined ? minutesToHm(Math.round(learned / 15) * 15) : defaultWorkoutTime(plan));
+      if (!fixedTemplate) Object.assign(wq, { tier: 'important' as const, reason: 'Flexible plan: train today if it fits your day.' });
+      created.push(wq);
     }
 
-    // Workload + adaptive state
+    // Progressive complexity: the first days start small.
+    const dayIndex = await adventureDay(date, tx.player, settings);
+    const ramp = rampLimits(dayIndex);
+    if (ramp) applyRamp(created, ramp, activities, dayIndex, existing.day);
+    for (const q of created) q.baseTier ??= q.tier;
+
+    // Daily capacity + priority balancing (core stays, optional work is trimmed first)
     const allDay = [...existing.day, ...created];
-    const capacity = dayCapacity(plan);
-    const workload = computeWorkload({
-      capacity,
-      questMinutes: allDay.reduce((s, q) => s + q.durationMin, 0),
-      questEnergy: allDay.reduce((s, q) => s + Math.max(0, q.energyCost), 0),
-      workoutScheduled: allDay.some((q) => q.kind === 'workout'),
-      energyStart: tx.player.energy,
-    });
+    const samples = await capacityHistory(date);
+    const loadInput = { settings, plan, date, energy: tx.player.energy, maxEnergy: tx.maxEnergy, history: samples, dayIndex, quests: allDay, activities };
+    const firstLoad = computeDayLoad(loadInput);
     const recentLogs = (await statsRepository.logs(shiftDate(date, -7), shiftDate(date, -1))).filter((l) => l.closed);
     const done7 = recentLogs.reduce((s, l) => s + l.core.done + l.important.done, 0);
     const total7 = recentLogs.reduce((s, l) => s + l.core.total + l.important.total, 0);
@@ -154,27 +198,14 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
     const consistency7d = recentLogs.length >= 3 ? recentLogs.filter((l) => l.success).length / recentLogs.length : null;
     const missedCore3d = recentLogs.filter((l) => daysBetween(l.date, date) <= 3).reduce((s, l) => s + (l.core.total - l.core.done), 0);
     const state = computeDifficultyState(
-      { workload: workload.score, energy: tx.player.energy, completion7d, missedCore3d, hp: tx.player.hp, recoveryMode: tx.player.recoveryMode },
+      { workload: firstLoad.score, energy: tx.player.energy, completion7d, missedCore3d, hp: tx.player.hp, recoveryMode: tx.player.recoveryMode },
       settings.rules.adaptive,
     );
-
-    // Workday awareness: keep the most important effortful quests, lighten the rest
-    const importanceOf = (q: Quest) => activities.find((a) => a.id === q.activityId)?.importance ?? (q.kind === 'workout' ? 5 : 3);
-    const cappable = () => created.map((q) => ({ id: q.id, tier: q.tier, importance: importanceOf(q), durationMin: q.durationMin, protected: q.kind === 'workout' || !!q.metric }));
-    const demoteCore = new Set(selectDemotions(cappable(), coreCap(workload.level, state, settings.rules.generator), 'core'));
-    for (const q of created) {
-      if (!demoteCore.has(q.id)) continue;
-      q.tier = 'important';
-      q.lightened = true;
-      q.reason = 'Lightened for a heavy day — still worth doing, no pressure.';
-    }
-    const demoteImportant = new Set(selectDemotions(cappable(), importantCap(workload.level, state, settings.rules.generator), 'important'));
-    for (const q of created) {
-      if (!demoteImportant.has(q.id)) continue;
-      q.tier = 'optional';
-      q.lightened = true;
-      q.reason = state === 'critical' ? 'Critical day: essentials only. This is a bonus.' : 'Bonus today: your day is already full. Do it if you can, no penalty if not.';
-    }
+    const load = computeDayLoad({ ...loadInput, state });
+    const changedExisting = applyDecisions(existing.day, load);
+    applyDecisions(created, load);
+    if (changedExisting.length) await questRepository.bulkPut(changedExisting.map((q) => ({ ...q, updatedAt: tx.now })));
+    const workload = { score: load.score, level: load.level, freeAfterQuestsMin: load.leftoverMin };
 
     const log: DayLog = {
       ...(tx.log.date === date ? tx.log : emptyLog(date, tx.player)),
@@ -184,6 +215,11 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
       workloadLevel: workload.level,
       difficultyState: state,
       consistency7d,
+      capacityMin: load.capacity.minutes,
+      plannedMin: load.plannedMin,
+      freeMin: load.capacity.freeMin,
+      workStatus: plan.workStatus,
+      dayIndex,
     };
     if (!opts.regenerate) {
       log.energyStart = tx.player.energy;
@@ -217,6 +253,7 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
         settings.rules.generator,
       );
       if (protect) budget = { ...budget, count: Math.min(budget.count, Number(protect.action.params?.keep ?? 0)) };
+      if (ramp) budget = { ...budget, count: Math.min(budget.count, ramp.side), challenge: budget.challenge && dayIndex > 0 };
       const side = await generateSideQuestsFor({
         ctx,
         dayQuests: allDay,
@@ -334,8 +371,11 @@ export async function closeDay(date: ISODate): Promise<ServiceResult> {
     }
     if (hadQuests && breakdown.total > (counters['record.score'] ?? 0)) tx.set({ 'record.score': breakdown.total });
 
+    const dayScoped = quests.filter((q) => !q.endDate && q.status !== 'moved');
     tx.log = {
       ...tx.log,
+      plannedMin: dayScoped.filter((q) => (q.tier === 'core' || q.tier === 'important') && !q.goal).reduce((sum, q) => sum + q.durationMin, 0),
+      completedMin: dayScoped.filter((q) => q.status === 'completed').reduce((sum, q) => sum + q.durationMin, 0),
       score: breakdown.total,
       breakdown,
       success: result.success,
@@ -375,12 +415,14 @@ export async function closeDay(date: ISODate): Promise<ServiceResult> {
 /** Change today's day type (workday / free / rest) and rebuild side quests accordingly. */
 export async function setDayType(date: ISODate, dayType: DayType, settings: Settings): Promise<ServiceResult> {
   const plan = await planFor(date, settings);
-  const base = settings.schedule.days[weekday(date)];
-  const next: DayPlan = {
-    ...plan,
-    dayType,
-    work: dayType === 'work' ? (plan.work ?? base.work ?? { start: '09:00', end: '18:00' }) : undefined,
-  };
+  let next: DayPlan;
+  if (dayType === 'rest') next = { ...plan, dayType: 'rest' };
+  else if (dayType === 'free') next = { ...applyWorkToPlan({ ...plan, dayType: 'free' }, { status: 'off' }), temporary: true };
+  else {
+    // "Working today" never invents hours: keep what we know, otherwise hours stay unset.
+    const known = plan.workStatus === 'set' || plan.workStatus === 'partial';
+    next = known ? { ...plan, dayType: 'work', temporary: true } : { ...applyWorkToPlan({ ...plan, dayType: 'free' }, { status: 'partial' }), temporary: true };
+  }
   await statsRepository.putPlan(next);
   return rebuildDay(date);
 }
@@ -431,6 +473,7 @@ export async function unlockFeaturesToday(): Promise<ServiceResult> {
 /** Onboarding: seed the first quest and start the first day. */
 export async function beginAdventure(): Promise<ServiceResult> {
   const today = clock.today();
+  if (!(await metaRepository.get<string>('adventureStart'))) await metaRepository.set('adventureStart', today);
   await metaRepository.remove('currentDate');
   const r = await ensureToday();
   await withTransaction(async () => {

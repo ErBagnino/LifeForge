@@ -31,13 +31,13 @@ export default function EconomyEditor() {
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <Field label="Base cost">
-                  <NumberInput value={b.baseCost} onChange={(v) => set({ baseCost: Math.max(0, Math.round(v)) })} aria-label="Base cost" className="!h-10" />
+                  <NumberInput value={b.baseCost} onChange={(v) => set({ baseCost: Math.max(0, Math.round(v)) })} aria-label="Base cost" className="!h-11" />
                 </Field>
                 <Field label="Growth">
-                  <NumberInput value={b.costGrowth} onChange={(v) => set({ costGrowth: Math.max(1, v) })} step={0.1} aria-label="Cost growth" className="!h-10" />
+                  <NumberInput value={b.costGrowth} onChange={(v) => set({ costGrowth: Math.max(1, v) })} step={0.1} aria-label="Cost growth" className="!h-11" />
                 </Field>
                 <Field label="Unlock lv">
-                  <NumberInput value={b.unlockLevel} onChange={(v) => set({ unlockLevel: Math.max(1, Math.round(v)) })} aria-label="Unlock level" className="!h-10" />
+                  <NumberInput value={b.unlockLevel} onChange={(v) => set({ unlockLevel: Math.max(1, Math.round(v)) })} aria-label="Unlock level" className="!h-11" />
                 </Field>
               </div>
               <div className="num mt-2 text-[12px] text-muted">{Array.from({ length: b.maxLevel }, (_, i) => `L${i + 1} ${formatInt(buildingCost(b, i + 1))}`).join(' · ')}</div>
@@ -70,7 +70,7 @@ export default function EconomyEditor() {
               <span className="min-w-0 flex-1 truncate text-[14px]">
                 {c.name} <span className="text-[11px] text-muted">{c.type}</span>
               </span>
-              <NumberInput value={c.price} onChange={(v) => setCos({ ...cos, [c.id]: { ...c, price: Math.max(0, Math.round(v)) } })} aria-label={`${c.name} price`} className="!h-9 !w-24 !px-2" />
+              <NumberInput value={c.price} onChange={(v) => setCos({ ...cos, [c.id]: { ...c, price: Math.max(0, Math.round(v)) } })} aria-label={`${c.name} price`} className="!h-11 !w-24 !px-2" />
             </div>
           );
         })}

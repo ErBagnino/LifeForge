@@ -1,0 +1,34 @@
+/** Walks through the 7-step onboarding (work schedule: "I don't know yet"). */
+module.exports = async function onboard(page, { name = 'Ale', shots, tag = '' } = {}) {
+  const shot = async (n) => { if (shots) { await page.waitForTimeout(450); await page.screenshot({ path: `${shots}${tag}ob-${n}.png` }); } };
+  await page.goto(process.env.QA_URL || 'http://localhost:4173/');
+  await page.waitForTimeout(1200);
+  await shot('0-welcome');
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.getByLabel('Nickname').fill(name);
+  await shot('1-name');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await shot('2-height');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await shot('3-weight');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: /Get stronger/ }).click();
+  await page.getByRole('button', { name: /Quit porn/ }).click();
+  await shot('4-goals');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Mon', exact: true }).click();
+  await page.getByRole('button', { name: 'Wed', exact: true }).click();
+  await page.getByRole('button', { name: 'Fri', exact: true }).click();
+  await shot('5-training');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await shot('6-habits');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: /I’ll add it/ }).click();
+  await shot('7a-work-add');
+  await page.getByRole('button', { name: /I don’t know yet/ }).click();
+  await shot('7-work');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await shot('8-ready');
+  await page.getByRole('button', { name: 'Start my first quest' }).click();
+  await page.waitForTimeout(2500);
+};

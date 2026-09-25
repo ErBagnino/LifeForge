@@ -54,7 +54,7 @@ export function Screen({
       <div className={cx(!noPad && 'px-safe', !hud && !back && !right && 'pt-safe')}>
         {title && (
           <header className="pt-3 pb-1">
-            <h1 className="text-[32px] leading-tight font-extrabold tracking-tight text-balance">{title}</h1>
+            <h1 className="text-[28px] leading-tight font-extrabold tracking-tight text-balance min-[390px]:text-[30px]">{title}</h1>
             {subtitle && <p className="mt-0.5 text-[15px] text-muted">{subtitle}</p>}
           </header>
         )}

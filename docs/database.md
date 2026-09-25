@@ -8,15 +8,15 @@ Types live in `src/types/*`.
 
 | Table | Primary key | Indexes | Contents |
 | --- | --- | --- | --- |
-| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `leisureTimer` (running play-time timer). |
+| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `adventureStart` (Day 1, drives the first-week ramp), `leisureTimer` (running play-time timer), `coachChat` (Coach history + pending question). |
 | `player` | `id` | | Single row `"me"`: xp, coins, hp, energy, stats, streak state, inventory (freezes, revives, rerolls), boosts, status effects, recovery mode, avatar, unlocked features. |
-| `settings` | `id` | | Single row `"settings"`: profile, schedule, work hours, body & nutrition, step targets, hydration, leisure budget, safety bounds, notifications, appearance, coach tone, difficulty, and the full editable `rules` (`GameRules`). Normalised on read, so new fields get defaults. |
+| `settings` | `id` | | Single row `"settings"`: profile (goals, focus, optional future goals), rhythm (wake/sleep, busy blocks, training availability), **work** (`status` + versioned `schedules`, every day `off`/`unknown`/`work` with optional start/end/break/duration/approximate), **known** (`set`/`not_set`/`unknown` per field), **exceptions** (no gym, more/less time, keep-all, push, time-boxed), **load** mode, **coach** (voice language, optional AI model — never the API key), body & nutrition, steps, hydration, leisure budget, safety bounds, notifications, appearance, difficulty, the editable `rules`, and `schemaVersion`. Normalised on read. |
 | `activities` | `id` | `category, tier, active` | The activity library (123 seeded): tier, recurrence, difficulty, duration, time of day, metric & mode, stats, tags, scalability. Editable in Admin. |
 | `routines` | `id` | | Morning/night routines: ordered activity ids, time, bonus. |
-| `quests` | `id` | `date, endDate, kind, status, activityId, [date+kind], [activityId+date]` | Quest instances per game day (plus multi-day weekly/boss quests with `endDate`). Stores status, progress, snoozes, `earned` (for undo/history), reason, `private`, `lightened`. |
-| `dayLogs` | `date` | | One row per game day: score breakdown, metrics totals, workload, adaptive state, energy/HP deltas, streak event, penalties, rules fired, routines done, `closed` flag. |
-| `dayPlans` | `date` | | Editable timeline/plan: wake, sleep, work block, busy blocks, day type (work/free/rest). |
-| `metrics` | `id` | `date, type, [date+type], [type+date]` | Raw manual entries: steps, distance, water, calories, protein, weight, sleep, workout minutes, **leisure** (play-time minutes, `note` = kind)… |
+| `quests` | `id` | `date, endDate, kind, status, activityId, [date+kind], [activityId+date]` | Quest instances per game day (plus multi-day weekly/boss quests with `endDate`). Stores status, progress, snoozes, `earned` (for undo/history), reason, `private`, `lightened`, `baseTier` (tier before balancing) and `kept` ("Keep this task"). |
+| `dayLogs` | `date` | | One row per game day: score breakdown, metrics totals, load score & level, adaptive state, **capacityMin / plannedMin / completedMin / freeMin / workStatus** (the history the capacity engine learns from), `dayIndex`, energy/HP deltas, streak event, penalties, rules fired, routines done, `closed` flag. |
+| `dayPlans` | `date` | | Per-day plan edits. `temporary: true` marks a **one-off schedule** ("tomorrow 10–20") that decides work for that date, with `workStatus` (`set`/`partial`/`unknown`/`off`), optional `workStart`/`workEnd`/`workMinutes`/`breakMin`/`workApproximate`. Other saved plans only carry busy blocks, wake/sleep and rest day, and work follows the regular week. |
+| `metrics` | `id` | `date, type, refId, [date+type], [type+date]` | Raw entries: steps, distance, water, calories, protein, carbs, fat, weight, sleep, workout minutes, **leisure** (play-time minutes, `note` = kind)… with `source` (`manual`/`timer`/`health`/`import`) and `refId` linking macro entries to their meal. |
 | `exercises` | `id` | | Exercise database (37 seeded): muscles, equipment, cues, illustration id, rep ranges, progression rule. |
 | `plans` | `id` | | Workout plans (seeded 3-day Upper A / Lower + Core / Upper B). |
 | `sessions` | `id` | `date, status, templateId` | Workout sessions with per-set logs (weight, reps, completed, RPE, note) and cardio entries. |
@@ -31,6 +31,7 @@ Types live in `src/types/*`.
 | `suggestions` | `id` | `key, status, type` | Pending YES/NO proposals (weight increase, step target, calories, time changes, deload, cardio stage…). `key` de-duplicates. |
 | `notifications` | `id` | `scheduledAt, tag, status` | Reminder log used by the frequency governor (sent, dismissed, per-day counts). |
 | `ledger` | `id` | `date, ts` | Every XP/coin/HP change with reason and source id, for the economy history and audits. |
+| `meals` | `id` | `date, ts` | Logged meals: name, items (name, grams, kcal, protein, carbs, fat), totals, optional small JPEG photo (≈360 px data URL), `source` (`manual`/`preset`/`photo`/`ai`). Deleting a meal removes its metric entries. |
 
 Compound indexes serve the hot paths: `[date+kind]` (today's board by kind), `[activityId+date]` (per-activity history
 and streaks), `[date+type]` / `[type+date]` (daily metric totals and trends).
@@ -56,8 +57,14 @@ and streaks), `[date+type]` / `[type+date]` (daily metric totals and trends).
 - `settingsRepository.get()` deep-fills missing settings fields from defaults (`normalizeSettings`), so adding a setting
   needs no migration.
 
-**Schema changes** use Dexie versioning: add `this.version(2).stores({...}).upgrade(tx => …)` in `db.ts`, keeping
-version 1 intact. Dexie upgrades existing installs in place on the next launch.
+**Schema changes** use Dexie versioning. **Version 2** (current) adds the `meals` table and a `refId` index on
+`metrics`. Future changes add `this.version(3).stores({...}).upgrade(tx => …)` in `db.ts` and keep earlier versions intact.
+Dexie upgrades existing installs in place on the next launch.
+
+**Settings migrations** use `settings.schemaVersion` (currently 2, applied once at boot by `settingsRepository.migrate()`).
+v1 → v2 moved work out of the weekly schedule into `work`. The old built-in default (Mon–Fri 09:00–19:00, an
+assumption) becomes **not set**, and a schedule the player had customised is kept as a real schedule version. For
+players who had onboarded, `known` fields are marked as set.
 
 ## Backup format (export / import)
 

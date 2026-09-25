@@ -1,5 +1,5 @@
 import { learnTimes, suggestTimeChanges } from '@/domain/habits';
-import { recommendCalories, recommendProtein, recommendStepTargets } from '@/domain/targets';
+import { calibrateStepTargets, recommendCalories, recommendProtein, recommendStepTargets } from '@/domain/targets';
 import {
   activityRepository,
   questRepository,
@@ -33,8 +33,18 @@ export async function refreshSuggestions(): Promise<void> {
   const logs = (await statsRepository.logs(shiftDate(today, -21), shiftDate(today, -1))).filter((l) => l.closed);
 
   const last7 = logs.filter((l) => daysBetween(l.date, today) <= 7).map((l) => l.metrics.steps ?? 0);
+  const calibration = settings.known.steps !== 'set' ? calibrateStepTargets(last7, settings.safety) : undefined;
+  if (calibration) {
+    await offer({
+      key: 'steps:calibration',
+      type: 'stepsTarget',
+      title: `Set your step target to ${calibration.next.ideal.toLocaleString('en-US')}?`,
+      body: calibration.reason,
+      payload: { next: calibration.next },
+    });
+  }
   const steps = recommendStepTargets(last7, settings.steps, settings.safety);
-  if (steps.action !== 'keep') {
+  if (!calibration && steps.action !== 'keep') {
     await offer({
       key: `steps:${wk}`,
       type: 'stepsTarget',
@@ -100,7 +110,7 @@ export async function acceptSuggestion(id: string): Promise<ServiceResult> {
   let result: ServiceResult = { events: [] };
   switch (s.type) {
     case 'stepsTarget':
-      next = { ...settings, steps: s.payload.next as StepTargets };
+      next = { ...settings, steps: s.payload.next as StepTargets, known: { ...settings.known, steps: 'set' } };
       break;
     case 'caloriesTarget':
       next = { ...settings, nutrition: { ...settings.nutrition, calories: Number(s.payload.next) } };

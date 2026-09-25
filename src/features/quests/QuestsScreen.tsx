@@ -84,7 +84,7 @@ function TodayTab() {
       {challenge.length ? list(challenge) : <Locked label="Daily Challenge" level={FEATURE_LEVELS.challenge} current={level} fallback="No challenge today — the game decided you have enough on your plate." />}
       <SectionTitle>Hidden quest</SectionTitle>
       {hidden.length ? list(hidden) : <Locked label="Hidden quests" level={FEATURE_LEVELS.hidden} current={level} fallback="No secret today. Or is there…" />}
-      <SectionTitle action={<button type="button" className="text-[14px] font-semibold text-accent" onClick={() => setManual(true)}>+ Custom</button>}>Side quests</SectionTitle>
+      <SectionTitle action={<button type="button" className="hit-44 text-[14px] font-semibold text-accent" onClick={() => setManual(true)}>+ Custom</button>}>Side quests</SectionTitle>
       {side.length ? list(side) : <Locked label="Side quests" level={FEATURE_LEVELS.sideQuests} current={level} fallback="No side quests today: workload or energy says protect the core." />}
       <SectionTitle>Scheduled</SectionTitle>
       {list(scheduled)}
@@ -206,7 +206,7 @@ function LibraryTab() {
       <TextInput value={query} onChange={setQuery} placeholder="Search activities…" aria-label="Search activities" type="search" />
       <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1">
         {(['all', ...CATEGORIES] as const).map((c) => (
-          <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
+          <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-11 shrink-0 rounded-full px-3.5 text-[13px] font-semibold', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
             {c === 'all' ? 'All' : `${CATEGORY_INFO[c].icon} ${CATEGORY_INFO[c].label}`}
           </button>
         ))}

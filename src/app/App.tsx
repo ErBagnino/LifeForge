@@ -5,7 +5,7 @@ import { FxLayer } from '@/components/fx/FxLayer';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { TabBar } from '@/components/layout/TabBar';
 import { Skeleton } from '@/components/ui/primitives';
-import { useOnline, useThemeSync } from '@/hooks';
+import { useKeyboardInset, useOnline, useThemeSync } from '@/hooks';
 import { onResume, useGame } from '@/store/gameStore';
 import { APP_CONFIG } from '@/config/app';
 import { usePwaUpdate } from './pwa';
@@ -43,6 +43,9 @@ const AiImportScreen = lazy(() => import('@/features/admin/AiImportScreen'));
 const RoutinesAdmin = lazy(() => import('@/features/admin/RoutinesAdmin'));
 const DevToolbox = lazy(() => import('@/features/dev/DevToolbox'));
 const Onboarding = lazy(() => import('@/features/onboarding/Onboarding'));
+const CoachScreen = lazy(() => import('@/features/coach/CoachScreen'));
+const NutritionScreen = lazy(() => import('@/features/nutrition/NutritionScreen'));
+const FoodScanScreen = lazy(() => import('@/features/nutrition/FoodScanScreen'));
 
 function PageFallback() {
   return (
@@ -56,13 +59,13 @@ function PageFallback() {
 
 function Shell() {
   const location = useLocation();
-  const hideTabs = location.pathname.startsWith('/train/workout');
+  const hideTabs = location.pathname.startsWith('/train/workout') || location.pathname.startsWith('/coach') || location.pathname.startsWith('/nutrition/scan');
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
   return (
     <>
-      <main id="main">
+      <main id="main" className="mx-auto w-full max-w-[640px]">
         <ErrorBoundary inline key={location.pathname}>
           <Suspense fallback={<PageFallback />}>
             <Outlet />
@@ -96,6 +99,7 @@ function Boot() {
   const error = useGame((s) => s.error);
   const boot = useGame((s) => s.boot);
   useThemeSync();
+  useKeyboardInset();
 
   useEffect(() => {
     void boot();
@@ -174,6 +178,9 @@ function Boot() {
           <Route path="achievements" element={<AchievementsScreen />} />
           <Route path="play" element={<PlayTimeScreen />} />
           <Route path="search" element={<SearchScreen />} />
+          <Route path="coach" element={<CoachScreen />} />
+          <Route path="nutrition" element={<NutritionScreen />} />
+          <Route path="nutrition/scan" element={<FoodScanScreen />} />
           <Route path="settings" element={<SettingsScreen />} />
           <Route path="settings/:section" element={<SettingsSection />} />
           <Route path="admin" element={<AdminScreen />} />

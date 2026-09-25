@@ -17,6 +17,7 @@ export function useQuestActions() {
     setActual: (q: Quest, time: TimeHM) => act(qs.setActualTime(q.id, time)),
     reroll: (q: Quest) => act(qs.rerollQuest(q.id)),
     remove: (q: Quest) => act(qs.deleteQuest(q.id)),
+    keep: (q: Quest) => act(qs.keepQuest(q.id)),
     /** Primary action: complete, or open the right tool (logger, metric input, play timer). */
     start: (q: Quest, openMetric: (q: Quest) => void) => {
       if (q.kind === 'workout') {

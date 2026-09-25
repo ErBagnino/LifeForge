@@ -71,7 +71,7 @@ export default function RoutinesAdmin() {
               <span>Active</span>
               <Toggle checked={edit.active} onChange={(v) => setEdit({ ...edit, active: v })} label="Active" />
             </div>
-            <SectionTitle action={<button type="button" className="text-[13px] font-semibold text-accent" onClick={() => setPicker(true)}>+ Add</button>}>Activities</SectionTitle>
+            <SectionTitle action={<button type="button" className="hit-44 text-[13px] font-semibold text-accent" onClick={() => setPicker(true)}>+ Add</button>}>Activities</SectionTitle>
             <div className="space-y-1.5">
               {edit.activityIds.map((id) => (
                 <div key={id} className="flex items-center justify-between rounded-2xl bg-surface px-3 py-2 shadow-card">

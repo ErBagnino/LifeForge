@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router';
 import { useEffect, useState } from 'react';
 import { Field, NumberInput, Segmented, Stepper, TimeInput } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
@@ -144,6 +145,7 @@ function StepsPanel() {
 }
 
 function FoodPanel() {
+  const navigate = useNavigate();
   const act = useGame((s) => s.act);
   const n = useGame((s) => s.settings?.nutrition);
   const m = useMetrics();
@@ -185,6 +187,14 @@ function FoodPanel() {
       <Button block size="lg" className="mt-3" icon="plus" disabled={!Object.values(meal).some((v) => v > 0)} onClick={() => void save()}>
         Add to today
       </Button>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button variant="tinted" icon="camera" onClick={() => navigate('/nutrition/scan')}>
+          Food photo
+        </Button>
+        <Button variant="secondary" onClick={() => navigate('/nutrition')}>
+          Meals & presets
+        </Button>
+      </div>
       <p className="mt-2 px-1 text-[12px] text-muted">Targets are your settings, not medical advice. Awareness beats perfection.</p>
     </div>
   );
@@ -298,7 +308,7 @@ function TodayEntries() {
               </span>
             </span>
             <span className="num text-[12px] text-muted">{tsToHm(e.ts)}</span>
-            <button type="button" aria-label="Delete entry" className="flex h-9 w-9 items-center justify-center rounded-full text-muted" onClick={() => void act(deleteMetric(e))}>
+            <button type="button" aria-label="Delete entry" className="flex h-11 w-11 items-center justify-center rounded-full text-muted" onClick={() => void act(deleteMetric(e))}>
               <Icon name="trash" size={16} />
             </button>
           </div>

@@ -15,13 +15,15 @@ and data (IndexedDB). There is no server in the core loop, and the optional push
 ├────────▼─────────────────────────────────────────────────────────────────────┤
 │  services/*  (use cases)                                                     │
 │  questService · dayService · workoutService · metricsService · tycoonService │
-│  goalService · suggestionService · insightsService · export/aiImport/admin   │
+│  scheduleService · coachService · foodService · goalService · suggestions    │
+│  insightsService · export/aiImport/admin · ai/claude (optional)              │
 │  GameTx (unit of work) · notifications · haptics · clock                     │
 ├────────▼──────────────────────────────┬──────────────────────────────────────┤
 │  domain/*  (pure functions, tested)   │  repositories/*  (only Dexie users)  │
 │  level · rewards · energy · hp ·      │  activity · quest · workout · stats  │
 │  streak · score · recurrence ·        │  achievement · tycoon · settings ·   │
-│  workload · adaptive · questGenerator │  notification  (+ player/meta/       │
+│  schedule · capacity · adaptive ·     │  notification  (+ player/meta/       │
+│  questGenerator · nlu · coachAssistant│                                      │
 │  achievements · rulesEngine ·         │  suggestion helpers)                 │
 │  progression · cardio · targets ·     ├──────────────────────────────────────┤
 │  tycoon · classes · coach · reminders │  repositories/db.ts: LifeForgeDB     │
@@ -96,12 +98,48 @@ travel. Everything calls `clock.now()` / `clock.today()`.
 
 1. `ensureToday()` runs at boot and on resume. If the stored day is older than today, it closes every missing day (score,
    streak, HP, penalties with caps, world income, achievements, weekly/boss settlement) and then starts today.
-2. `startDay()` computes workload (work hours, calendar, workout), picks the adaptive state, instantiates due activities
-   (recurrence spreading, workday awareness), caps effortful core/important quests, adds routines, the workout, side
-   quests, daily challenge, hidden quest, weekly/boss quests, and saves a `DayPlan`.
+2. `startDay()` resolves the day plan (regular week → temporary override), instantiates due activities (recurrence
+   spreading, workday awareness, flexible training when availability is unknown, no-gym exceptions), applies the
+   **first-week ramp** (Day 1 = up to 4 core objectives + the first quest), computes the **daily capacity**, balances
+   quests by priority (core stays, important fills the remaining room, the rest becomes a no-pressure bonus unless
+   the player kept it), picks the adaptive state, then adds side quests sized to the leftover capacity, the daily
+   challenge, the hidden quest and weekly/boss quests. `rebuildDay()` re-runs the same balancing on existing quests
+   whenever the schedule changes.
 3. During the day, quests move through `pending → completed | skipped | failed | snoozed`. Smart rules run on
    `quest_completed`, `workout_completed`, `check` and `day_start/day_end` triggers.
 4. `closeDay()` settles the day. `atMost` metric quests (e.g. play time ≤ 90 min) are auto-won if the limit held.
+
+## Schedules, capacity and the player's control
+- `domain/schedule.ts`: the work model (`WorkSettings` with versioned `WorkSchedule`s; each weekday is `off`,
+  `unknown` or `work` with *optional* start/end/break/duration/approximate). `resolveWork(date)` only **derives**: start
+  + duration gives an end, start alone stays partial. A temporary `DayPlan` (`temporary: true`) overrides a single date.
+  Exceptions (`no_gym`, `more_time`, `less_time`, `keep_all`, `push`) are time-boxed and drive `loadModeFor(date)` and
+  `capacityAdjustment(date)`. `migrateWork()` turns the old assumed Mon–Fri 09–19 default into "not set".
+- `domain/capacity.ts`: `computeCapacity()` blends known free time × a learned share of free time actually used
+  with the minutes usually completed on similar days (work / free / unknown). It then applies energy, recent
+  completion and more/less-time periods. `balanceLoad()` does the priority fit. `rampLimits()` defines the first week.
+- `services/game/load.ts` gathers history (`capacityHistory`) and applies the decisions, remembering `baseTier` so a
+  rebalance can restore quests. A player override (`kept`) is never demoted again.
+- `services/scheduleService.ts`: every availability change (schedule versions, one-off days, exceptions, load mode,
+  training days, "not sure yet") saves settings and rebalances today. `previewRebalance(settings, date, plan?)`
+  computes the effect of hypothetical settings without writing, and powers the Coach's impact preview.
+- Missing info is modelled explicitly: `Settings.known` holds `set | not_set | unknown` per field, and
+  `domain/profile.ts` presents fields as SET / NOT SET / OPTIONAL. Nothing treats a missing value as an error.
+
+## Coach (configuration assistant)
+```
+text ─► domain/nlu.ts (normalize → days/scope/times/numbers → Intent[])
+     ─► domain/coachAssistant.ts respond(): reply | question (+ quick replies, pending state) | Proposal(ConfigChange[])
+     ─► services/coachService.ts: impact preview (previewRebalance) → APPLY → applyChanges() → schedule/settings services
+```
+- Deterministic and on-device (Italian + English). It never invents: a start without an end stays partial, and
+  ambiguous scope ("lavoro 9–18" with no date) triggers a question with quick replies.
+- Proposals are data (`ConfigChange` union). Nothing is written until APPLY. "sì" confirms, and "no" / "non mi va" /
+  "lascia tutto com'è" dismiss. Chat history lives in `meta.coachChat`.
+- Optional fallback: `services/ai/claude.ts` makes one forced tool call to the Messages API with the player's own key (stored
+  in localStorage, excluded from backups). The output is validated with Zod against the same `ConfigChange` schema
+  and still shown as a proposal. Food photos use the same client with a `log_meal` tool. Models are listed from the API,
+  never hard-coded.
 
 ## Notifications
 `services/notifications/NotificationService.ts` exposes providers (`inapp`, `browser`, `webpush`, reserved `native`).
@@ -131,6 +169,17 @@ Private quests (tag `private`, e.g. NoFap) always get neutral titles like "Eveni
 - Screens render explicit **loading** (skeletons), **empty** (EmptyState with a next step) and **offline** (banner via
   `useOnline`) states.
 
+## Mobile layout: safe areas, keyboard, widths
+- Safe areas come from `env(safe-area-inset-*)` via CSS variables (`--safe-top/bottom/left/right`): the HUD, sticky
+  headers, tab bar, sheets and full-screen views pad for the Dynamic Island and home indicator.
+- `useKeyboardInset()` tracks the iOS visual viewport and publishes `--kb`, `--vvh` and `--vvtop`, plus `html.kb-open`.
+  The tab bar hides while typing, sheets lift above the keyboard, footers use `.pb-kb`, and the Coach sizes itself to the
+  visible area so the composer stays above the keyboard.
+- Content is a centred column (max 640 px) on tablets and desktop. Screens are designed at 393 × 852 first.
+- Touch targets are ≥ 44 px. Compact controls (segmented tabs, switches, 7-day grids) keep their visual size and get a
+  44 × 44 hit area through the `.hit-44` utility.
+- Progressive disclosure: Today uses `Collapsible` sections whose open state is remembered per device.
+
 ## Accessibility & performance
 - Semantic buttons/tabs/dialogs, `aria-label`s on icon buttons, visible focus rings, 44 pt touch targets, and Dynamic Type
   friendly sizes. `prefers-reduced-motion` disables particles and big transitions. Charts have a table view.
@@ -143,10 +192,19 @@ Private quests (tag `private`, e.g. NoFap) always get neutral titles like "Eveni
 - `src/domain/__tests__/*`: engines: level curve, XP/coins/energy, HP caps & recovery, streaks (freeze, revive, sick day),
   score redistribution, recurrence, day close, workload, adaptive caps, quest generator budget, next action, smart rules,
   reminders + governor, snooze & habit learning, progression (incl. the 20 kg → 22.5 kg spec example), cardio, adaptive
-  targets, achievements, tycoon economy, classes, records, goals, play-time budget.
+  targets, achievements, tycoon economy, classes, records, goals, play-time budget, work schedule resolution &
+  migration, daily capacity (Day A/B/C example), priority balancing & overrides, first-week ramp, Coach language
+  parser (every example sentence of the spec, IT + EN), Coach assistant flows (questions, proposals, merges).
 - `src/services/__tests__/gameLoop.test.ts`: the real services on a fresh fake IndexedDB: seeding and the first day, first
   quest (XP, coins, FIRST BLOOD, first upgrade funded), undo, metric-driven quests, play-time timer and day-close win/fail,
   snooze/skip, day rollover with streak, rest day, workout session → progression suggestion, tycoon blockers, export →
-  validate → import round-trip, and AI import parsing/validation/unsafe-pattern warnings.
+  validate → import round-trip, and AI import parsing/validation/unsafe-pattern warnings, Day 1 ramp, running with no
+  work schedule, temporary vs recurring schedules, "Keep this task" surviving a rebalance, meals.
+- `src/services/__tests__/coach.test.ts`: the Coach end to end (preview with impact → APPLY, "sì" confirms, dismiss,
+  plan-my-day flow, optional AI fallback with a mocked API and schema validation).
+- `npm run qa` (`scripts/qa/audit.cjs`) runs Playwright against the preview build with simulated safe areas. It
+  onboards a fresh player and, on every route, checks zero horizontal overflow, no clipped controls, ≥ 44 px targets
+  and no console errors. It was run at 375/390/393/430/768/1440 px and 852×393 landscape, plus screenshot reviews in
+  light and dark mode.
 
 Run everything with `npm run check`.

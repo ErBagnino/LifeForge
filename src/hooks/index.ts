@@ -110,3 +110,98 @@ if (typeof window !== 'undefined') {
     lastPointer.y = e.clientY;
   }, { passive: true, capture: true });
 }
+
+/**
+ * iOS keyboard awareness. The on-screen keyboard shrinks the *visual* viewport only, so
+ * fixed footers end up hidden behind it. We publish the covered height as `--kb` and
+ * toggle `html.kb-open`, letting the tab bar hide and composers/footers lift above it.
+ */
+export function useKeyboardInset(): void {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      const open = covered > 80;
+      root.style.setProperty('--kb', `${open ? covered : 0}px`);
+      // Full-screen views (the Coach chat) size themselves to the visible area.
+      root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      root.style.setProperty('--vvtop', `${Math.round(vv.offsetTop)}px`);
+      root.classList.toggle('kb-open', open);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+}
+
+type SpeechResultEvent = { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> };
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: SpeechResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+function speechCtor(): (new () => SpeechRecognitionLike) | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
+
+/**
+ * Voice input via the Web Speech API where the browser offers it. Elsewhere
+ * (e.g. some iOS home-screen modes) `supported` is false and the keyboard's
+ * dictation key is the fallback.
+ */
+export function useSpeech(lang: string, onText: (text: string, final: boolean) => void) {
+  const [listening, setListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const rec = useRef<SpeechRecognitionLike | null>(null);
+  const cb = useRef(onText);
+  useEffect(() => {
+    cb.current = onText;
+  }, [onText]);
+  const Ctor = speechCtor();
+  const start = () => {
+    if (!Ctor) return;
+    setError(null);
+    const r = new Ctor();
+    r.lang = lang || navigator.language || 'it-IT';
+    r.interimResults = true;
+    r.continuous = false;
+    r.onresult = (e) => {
+      let text = '';
+      let final = false;
+      for (let i = 0; i < e.results.length; i++) {
+        text += e.results[i][0].transcript;
+        final = e.results[i].isFinal;
+      }
+      cb.current(text, final);
+    };
+    r.onerror = (e) => setError(e.error === 'not-allowed' ? 'Microphone permission denied.' : 'Voice input stopped.');
+    r.onend = () => setListening(false);
+    rec.current = r;
+    try {
+      r.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  };
+  const stop = () => {
+    rec.current?.stop();
+    setListening(false);
+  };
+  useEffect(() => () => rec.current?.stop(), []);
+  return { supported: !!Ctor, listening, error, start, stop };
+}

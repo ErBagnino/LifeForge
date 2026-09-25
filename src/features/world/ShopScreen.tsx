@@ -162,7 +162,7 @@ function RewardsTab() {
   return (
     <div className="mt-3">
       <p className="px-1 text-[13px] text-muted">Real-world treats you define and approve. Coins buy the permission — the reward is yours. Food rewards are a free choice, never a “cheat day” or compensation.</p>
-      <SectionTitle action={<button type="button" className="text-[14px] font-semibold text-accent" onClick={() => setEdit({ id: uid('rw_'), name: '', icon: '🎁', kind: 'leisure', cost: 300, approved: true, cooldownDays: 0, redeemedCount: 0, createdAt: Date.now() })}>+ New</button>}>
+      <SectionTitle action={<button type="button" className="hit-44 text-[14px] font-semibold text-accent" onClick={() => setEdit({ id: uid('rw_'), name: '', icon: '🎁', kind: 'leisure', cost: 300, approved: true, cooldownDays: 0, redeemedCount: 0, createdAt: Date.now() })}>+ New</button>}>
         Your rewards
       </SectionTitle>
       {!approved.length && <EmptyState icon="🎁" title="No approved rewards yet" body="Approve a suggestion below or create your own." />}

@@ -19,7 +19,7 @@ the codebase already has ready for it, and which path to take when you want it.
 | **Reliable reminders** | UserNotifications | Schedule local notifications days ahead with no server. This removes the biggest PWA limitation (reminders only fire while the app is open unless Web Push is configured). |
 | **Home & lock-screen widgets** | WidgetKit | Today Score ring, streak, HP/energy, next quest, play time left. |
 | **Apple Watch** | watchOS app + WorkoutKit / HKWorkoutSession | Log sets and RPE from the wrist, rest-timer haptics, heart rate during cardio, a complication with the streak. |
-| **Siri & Shortcuts** | App Intents | "Log 500 ml of water", "Start play timer", "What's my next quest?". Automations like "when I open TikTok → start the play timer". |
+| **Siri & Shortcuts** | App Intents | "Log 500 ml of water", "Start play timer", "What's my next quest?", or pass any sentence to the Coach ("tomorrow I work 10–20"): its parser is plain TypeScript and returns the same previewable proposals. Automations like "when I open TikTok → start the play timer". |
 | **Screen Time** | FamilyControls + DeviceActivity + ManagedSettings | Automatic play-time tracking/limits for chosen apps (see the caveats below). |
 | **Haptics** | Core Haptics / UIFeedbackGenerator | Proper haptics everywhere. The PWA only has the iOS `<input switch>` trick and `navigator.vibrate` where available. |
 

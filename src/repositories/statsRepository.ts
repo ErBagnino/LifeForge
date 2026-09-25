@@ -1,4 +1,4 @@
-import type { DayLog, DayPlan, ISODate, LedgerEntry, MetricEntry, MetricType, PersonalRecord } from '@/types';
+import type { DayLog, DayPlan, ISODate, LedgerEntry, Meal, MetricEntry, MetricType, PersonalRecord } from '@/types';
 import { getDb } from './db';
 
 /** Metrics summed per day; the others keep the latest value. */
@@ -19,6 +19,12 @@ export interface StatsRepository {
   metricsByDate(date: ISODate): Promise<MetricEntry[]>;
   metricsRange(from: ISODate, to: ISODate): Promise<MetricEntry[]>;
   metricsOfType(type: MetricType, from: ISODate, to: ISODate): Promise<MetricEntry[]>;
+  metricsByRef(refId: string): Promise<MetricEntry[]>;
+
+  putMeal(meal: Meal): Promise<void>;
+  removeMeal(id: string): Promise<void>;
+  mealsByDate(date: ISODate): Promise<Meal[]>;
+  mealsRange(from: ISODate, to: ISODate): Promise<Meal[]>;
 
   counters(): Promise<Record<string, number>>;
   incrementCounters(inc: Record<string, number>): Promise<void>;
@@ -53,6 +59,14 @@ export const statsRepository: StatsRepository = {
   metricsRange: (from, to) => getDb().metrics.where('date').between(from, to, true, true).toArray(),
   metricsOfType: (type, from, to) =>
     getDb().metrics.where('[type+date]').between([type, from], [type, to], true, true).toArray(),
+  metricsByRef: (refId) => getDb().metrics.where('refId').equals(refId).toArray(),
+
+  putMeal: async (meal) => {
+    await getDb().meals.put(meal);
+  },
+  removeMeal: (id) => getDb().meals.delete(id),
+  mealsByDate: async (date) => (await getDb().meals.where('date').equals(date).toArray()).sort((a, b) => a.ts - b.ts),
+  mealsRange: (from, to) => getDb().meals.where('date').between(from, to, true, true).toArray(),
 
   counters: async () => {
     const out: Record<string, number> = {};

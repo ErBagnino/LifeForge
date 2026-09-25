@@ -87,6 +87,10 @@ export interface Quest {
   private?: boolean;
   /** True when the workload engine demoted the quest to protect the day. */
   lightened?: boolean;
+  /** Tier the quest had before balancing (restored when the day is rebalanced). */
+  baseTier?: QuestTier;
+  /** The player said "Keep this task": balancing never demotes it again. */
+  kept?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

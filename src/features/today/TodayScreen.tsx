@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Segmented } from '@/components/ui/forms';
 import { Icon } from '@/components/ui/Icon';
-import { Button, Card, Chip, EmptyState, SectionTitle } from '@/components/ui/primitives';
+import { Collapsible } from '@/components/ui/Collapsible';
+import { Button, Card, Chip, EmptyState } from '@/components/ui/primitives';
+import { rampLimits } from '@/domain/capacity';
 import { DIFFICULTY_STATE_INFO } from '@/domain/adaptive';
 import { coachLine } from '@/domain/coach';
 import { tierCount } from '@/domain/score';
@@ -25,8 +27,9 @@ import { RoutineCard } from './RoutineCard';
 import { ScoreCard } from './ScoreCard';
 import { SuggestionCards } from './SuggestionCards';
 import { Timeline } from './Timeline';
+import { WorkNudge } from './WorkNudge';
+import { NutritionGlance, StatsGlance } from './TodayExtras';
 
-const DAY_ICON = { work: '💼', free: '🌤️', rest: '🛌' } as const;
 
 function groupQuests(all: Quest[], routines: Routine[]) {
   const pending = (q: Quest) => q.status === 'pending';
@@ -62,7 +65,6 @@ export default function TodayScreen() {
   const [sheet, setSheet] = useState<Quest | null>(null);
   const [quick, setQuick] = useState<{ open: boolean; tab: QuickTab }>({ open: false, tab: 'water' });
   const [dayOpen, setDayOpen] = useState(false);
-  const [showDone, setShowDone] = useState(false);
 
   const date = today?.date ?? clock.today();
   const { data: streaks } = useAsync(async () => {
@@ -96,16 +98,29 @@ export default function TodayScreen() {
     </div>
   );
 
+  const dayIndex = today.log?.dayIndex ?? 99;
+  const ramp = rampLimits(dayIndex);
+  const workStatus = today.plan.workStatus ?? (today.plan.work ? 'set' : 'off');
+  const dayLabel =
+    today.plan.dayType === 'rest'
+      ? { icon: '🛌', text: 'Rest day' }
+      : workStatus === 'unknown'
+        ? { icon: '📅', text: 'Hours not set' }
+        : workStatus === 'off'
+          ? { icon: '🌤️', text: 'Free day' }
+          : { icon: '💼', text: workStatus === 'partial' ? 'Workday · partial' : 'Workday' };
+  const sideOpen = groups.side.length <= 3;
+
   return (
     <Screen hud>
-      <div className="mt-4 flex items-center justify-between gap-2">
+      <div className="mt-4 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-muted">{formatDate(date, 'EEEE d MMMM')}</div>
-          <h1 className="text-[30px] leading-tight font-extrabold tracking-tight">Today</h1>
+          <div className="truncate text-[13px] font-semibold text-muted">{formatDate(date, 'EEEE d MMMM')}</div>
+          <h1 className="text-[28px] leading-tight font-extrabold tracking-tight">{ramp?.label ? `Day ${dayIndex + 1}` : 'Today'}</h1>
         </div>
-        <button type="button" onClick={() => setDayOpen(true)} className="flex shrink-0 flex-col items-end gap-1" aria-label="Today setup">
-          <Chip icon={DAY_ICON[today.plan.dayType]}>
-            {today.plan.dayType === 'work' ? 'Workday' : today.plan.dayType === 'free' ? 'Free day' : 'Rest day'}
+        <button type="button" onClick={() => setDayOpen(true)} className="flex min-h-11 shrink-0 flex-col items-end justify-center gap-1" aria-label="Today setup">
+          <Chip icon={dayLabel.icon}>
+            {dayLabel.text}
             {today.log?.sick ? ' · 🤒' : ''}
           </Chip>
           <Chip icon={state.icon}>
@@ -120,6 +135,20 @@ export default function TodayScreen() {
         </div>
       )}
 
+      {ramp && (
+        <Card className="mt-4 bg-gradient-to-br from-accent/12 to-xp/10">
+          <div className="text-[12px] font-extrabold tracking-widest text-accent">{ramp.label?.toUpperCase() ?? `DAY ${dayIndex + 1}`}</div>
+          <div className="mt-1 text-[17px] font-bold">
+            {dayIndex === 0 ? `Start small: ${core.total} core objectives.` : `${core.total} core objectives today.`}
+          </div>
+          <p className="mt-1 text-[13px] text-muted">
+            {dayIndex === 0 ? 'That’s the whole day. Routines, side quests and bigger goals unlock as you play.' : 'The board grows a little each day while the game learns your rhythm.'}
+          </p>
+        </Card>
+      )}
+
+      <WorkNudge date={date} workStatus={workStatus} dayIndex={dayIndex} onSetup={() => setDayOpen(true)} />
+
       {firstPending && (
         <Card className="mt-4 border-2 border-accent/40">
           <div className="text-[12px] font-extrabold tracking-widest text-accent">FIRST QUEST</div>
@@ -132,11 +161,11 @@ export default function TodayScreen() {
         <Card className="mt-4" onClick={() => navigate('/world')}>
           <div className="flex items-center gap-3">
             <span className="text-[34px]">🏗️</span>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <div className="text-[12px] font-extrabold tracking-widest text-success">FIRST UPGRADE UNLOCKED</div>
               <div className="text-[15px] font-semibold">You have {player.coins} coins. Buy the Cozy Lamp for your room.</div>
             </div>
-            <Icon name="chevronRight" className="text-faint" />
+            <Icon name="chevronRight" className="shrink-0 text-faint" />
           </div>
         </Card>
       )}
@@ -144,30 +173,12 @@ export default function TodayScreen() {
       <ScoreCard />
       <NextActionCard onStart={start} onOpen={setSheet} />
       <SuggestionCards />
-      <PlayTimeCard />
 
-      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
-        {(
-          [
-            ['water', '💧', 'Water'],
-            ['steps', '👟', 'Steps'],
-            ['food', '🍽️', 'Food'],
-            ['sleep', '😴', 'Sleep'],
-            ['weight', '⚖️', 'Weight'],
-            ['activity', '🏃', 'Activity'],
-          ] as [QuickTab, string, string][]
-        ).map(([tab, icon, label]) => (
-          <button key={tab} type="button" onClick={() => setQuick({ open: true, tab })} className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-4 text-[14px] font-semibold shadow-card active:scale-95">
-            <span aria-hidden>{icon}</span> {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-5 flex items-center justify-between">
+      <div className="mt-5 flex items-center justify-between gap-2">
         <h2 className="text-[20px] font-bold">Quests</h2>
         <Segmented
           size="sm"
-          className="w-[190px]"
+          className="w-[184px] shrink-0"
           value={view}
           onChange={setView}
           options={[
@@ -185,14 +196,12 @@ export default function TodayScreen() {
         <>
           {today.quests.length === 0 && <EmptyState icon="🌱" title="No quests yet" body="Your board is being prepared. Pull in something from the library meanwhile." action={<Button onClick={() => navigate('/quests')}>Open quests</Button>} />}
           {groups.core.length > 0 && (
-            <>
-              <SectionTitle>Core · {core.done}/{core.total}</SectionTitle>
+            <Collapsible id="core" title="Core quests" meta={`${core.done}/${core.total}`} className="!mt-3">
               {renderList(groups.core)}
-            </>
+            </Collapsible>
           )}
           {groups.routines.length > 0 && (
-            <>
-              <SectionTitle>Routines</SectionTitle>
+            <Collapsible id="routines" title="Routines" meta={groups.routines.length}>
               <div className="space-y-2">
                 {groups.routines.map((g) => (
                   <RoutineCard key={g.routine.id} routine={g.routine} quests={g.quests} done={!!today.log?.routinesDone?.includes(g.routine.id)}>
@@ -200,42 +209,54 @@ export default function TodayScreen() {
                   </RoutineCard>
                 ))}
               </div>
-            </>
+            </Collapsible>
           )}
           {groups.special.length > 0 && (
-            <>
-              <SectionTitle>Challenge & secrets</SectionTitle>
+            <Collapsible id="special" title="Challenge & secrets" meta={groups.special.length}>
               {renderList(groups.special)}
-            </>
+            </Collapsible>
           )}
           {groups.important.length > 0 && (
-            <>
-              <SectionTitle>Important</SectionTitle>
+            <Collapsible id="important" title="Important" meta={groups.important.length}>
               {renderList(groups.important)}
-            </>
+            </Collapsible>
           )}
           {groups.side.length > 0 && (
-            <>
-              <SectionTitle>Side quests</SectionTitle>
+            <Collapsible id="optional" title="Optional & side quests" meta={groups.side.length} defaultOpen={sideOpen}>
               {renderList(groups.side)}
-            </>
+            </Collapsible>
           )}
           {groups.done.length > 0 && (
-            <>
-              <SectionTitle
-                action={
-                  <button type="button" className="text-[13px] font-semibold text-accent" onClick={() => setShowDone((v) => !v)}>
-                    {showDone ? 'Hide' : 'Show'}
-                  </button>
-                }
-              >
-                Done · {groups.done.filter((q) => q.status === 'completed').length}
-              </SectionTitle>
-              {showDone && renderList(groups.done)}
-            </>
+            <Collapsible id="done" title="Done" meta={groups.done.filter((q) => q.status === 'completed').length} defaultOpen={false}>
+              {renderList(groups.done)}
+            </Collapsible>
           )}
         </>
       )}
+
+      <PlayTimeCard />
+      <NutritionGlance />
+
+      <Collapsible id="quick" title="Quick log" className="!mt-4">
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          {(
+            [
+              ['water', '💧', 'Water'],
+              ['steps', '👟', 'Steps'],
+              ['food', '🍽️', 'Food'],
+              ['sleep', '😴', 'Sleep'],
+              ['weight', '⚖️', 'Weight'],
+              ['activity', '🏃', 'Activity'],
+            ] as [QuickTab, string, string][]
+          ).map(([tab, icon, label]) => (
+            <button key={tab} type="button" onClick={() => setQuick({ open: true, tab })} className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-4 text-[14px] font-semibold shadow-card active:scale-95">
+              <span aria-hidden>{icon}</span> {label}
+            </button>
+          ))}
+        </div>
+      </Collapsible>
+
+      <StatsGlance />
 
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Card onClick={() => navigate('/review/day')} className={evening ? 'border-2 border-accent/40' : ''}>

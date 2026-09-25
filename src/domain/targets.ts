@@ -53,6 +53,26 @@ export function recommendStepTargets(
   return { action: 'keep', next: current, reason: 'Target is well calibrated. Keep going.' };
 }
 
+/**
+ * Calibration for players who said "not sure" about their steps: after 5 logged days,
+ * propose a target just above their real average (bounded by the safety limits).
+ */
+export function calibrateStepTargets(last: number[], safety: SafetyBounds): TargetRecommendation<StepTargets> | undefined {
+  const logged = last.filter((s) => s > 0);
+  if (logged.length < 5) return undefined;
+  const avg = mean(logged);
+  const ideal = clamp(roundTo(avg * 1.05, safety.stepIncrement), safety.stepFloor, safety.stepCeiling);
+  return {
+    action: 'keep',
+    next: {
+      ideal,
+      min: clamp(roundTo(ideal * 0.85, safety.stepIncrement), safety.stepFloor, ideal),
+      stretch: clamp(roundTo(ideal * 1.3, safety.stepIncrement), ideal, safety.stepCeiling * 1.5),
+    },
+    reason: `You averaged ${Math.round(avg).toLocaleString('en-US')} steps over ${logged.length} days. A target just above that keeps it winnable.`,
+  };
+}
+
 export interface WeightPoint {
   /** Days since an arbitrary origin. */
   day: number;

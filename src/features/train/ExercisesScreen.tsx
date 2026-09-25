@@ -30,7 +30,7 @@ export default function ExercisesScreen() {
       <TextInput value={q} onChange={setQ} placeholder="Search by name or muscle…" type="search" aria-label="Search exercises" className="mt-3" />
       <div className="mt-2 flex gap-1.5">
         {CATS.map((c) => (
-          <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-9 rounded-full px-3 text-[13px] font-semibold capitalize', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
+          <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-11 rounded-full px-3.5 text-[13px] font-semibold capitalize', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
             {c}
           </button>
         ))}

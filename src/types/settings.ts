@@ -8,6 +8,7 @@ import type {
   WorkloadLevel,
 } from './common';
 import type { ScoreComponentKey } from './day';
+import type { AvailabilityException, Knowledge, KnownField, LoadMode, WorkSettings } from './schedule';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type CoachTone = 'balanced' | 'serious' | 'motivational' | 'ironic' | 'provocative';
@@ -15,17 +16,27 @@ export type ReducedMotionPref = 'system' | 'on' | 'off';
 export type BodyGoal = 'lose' | 'maintain' | 'gain';
 
 export interface DaySchedule {
-  type: Exclude<DayType, 'rest'>;
+  /** @deprecated Work now lives in `Settings.work`; kept only to read old backups. */
+  type?: Exclude<DayType, 'rest'>;
+  /** @deprecated See `Settings.work`. */
   work?: TimeBlock;
   busy: TimeBlock[];
   trainingAvailable: boolean;
 }
 
 export interface WeeklySchedule {
+  /** Planning value; check `Settings.known.wake` to know whether the player actually set it. */
   wake: TimeHM;
   sleep: TimeHM;
   /** Index = JS weekday (0 = Sunday). */
   days: DaySchedule[];
+}
+
+export interface CoachSettings {
+  /** BCP-47 language for voice input, e.g. "it-IT". Empty = device language. */
+  voiceLang: string;
+  /** Optional Claude connection (the API key itself is kept out of settings and backups). */
+  ai: { enabled: boolean; model: string };
 }
 
 export interface NutritionTargets {
@@ -273,6 +284,10 @@ export interface ProfileSettings {
   fitnessGoals: string[];
   petName: string;
   petEmoji: string;
+  /** Free text, optional ("run a 10k next spring"). */
+  futureGoals?: string;
+  /** Current main focus (e.g. "strength"): nudges side quests toward it. */
+  focus?: string;
 }
 
 export interface TrackingSettings {
@@ -292,6 +307,12 @@ export interface Settings {
   haptics: boolean;
   dayStartHour: number;
   schedule: WeeklySchedule;
+  work: WorkSettings;
+  /** What the player has actually told us (vs planning defaults). */
+  known: Record<KnownField, Knowledge>;
+  exceptions: AvailabilityException[];
+  load: { mode: LoadMode };
+  coach: CoachSettings;
   nutrition: NutritionTargets;
   body: BodyProfile;
   steps: StepTargets;
@@ -306,5 +327,7 @@ export interface Settings {
   devMode: boolean;
   /** Dev time-travel offset. */
   clockOffsetMs: number;
+  /** Settings shape version, used for one-time migrations. */
+  schemaVersion: number;
   updatedAt: number;
 }

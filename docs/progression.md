@@ -136,33 +136,56 @@ Starting values (editable, not medical advice): **74 kg · 170 cm · 1,800 kcal 
 - The score rewards being **within ±10% of the calorie target**, not eating less. There's no bonus for undereating, and no
   fasting or skipped-meal quests exist.
 
-## 8. Adaptive difficulty & workload
+## 8. Daily capacity, balancing & adaptive difficulty
 
-**Workload (0–100)** = `work min / 600 × 50` (a 10 h workday = 50) + `busy hours × 6` + `planned quest minutes / free
-minutes × 20` (capped at 1.5×) + 5 for a workout + up to 15 for low starting energy. Levels: low < 35 ≤ medium < 65 ≤ high.
+**Capacity** (`computeCapacity`, minutes of quest time for today):
 
-| Workload | Max effortful core | Max important | Side quests | Max side duration |
-| --- | ---: | ---: | ---: | ---: |
-| low | 8 | 8 | 4 | 45 min |
-| medium | 5 | 5 | 2 | 20 min |
-| high | 4 | 3 | 1 | 10 min |
+```
+free        = awake − known work − busy blocks          (undefined when work hours are unknown)
+share       = learned share of free time actually completed (median ×1.15, 15–70%), default 35%
+learned     = median minutes completed on similar days ×1.15 (work / free / unknown), needs ≥ 3 samples
+capacity    = free × share                  blended 60/40 with `learned` when similar days exist
+            = learned (or 120 min default)  when work hours are unknown
+            × energy factor (0.7 at 0% … 1.1 at 100%)
+            × 0.85 if < 50% of planned minutes got done lately, × 1.1 if > 90%
+            × 1.25 / 0.75 during "more time" / "less time" periods, × 0.5 on rest days
+            → clamped to 20–600 min
+```
 
-Quests of ≤ 5 minutes (teeth, the NoFap check-in, a glass of water…) don't count against the caps. Above the cap, the
-least important (then longest) quests are **demoted to optional**, never deleted. Protected quests (the workout and
-metric-tracked ones like water, steps, protein and the play-time budget) are kept first.
+**Load score** = planned minutes ÷ capacity × 70 (+ up to 10 for low energy): < 35 low · < 65 medium · ≥ 65 high.
 
-**Difficulty state** (each morning):
+**Balancing** (`balanceLoad`, mode `auto`):
+
+1. Core quests stay. They're only lightened (to important) when core alone exceeds capacity × 1.2, starting from the
+   least important and longest, never below 3 effortful core quests, and never the workout, metric-tracked goals,
+   private goals (NoFap) or anything you kept.
+2. Important quests fill the remaining capacity by priority (kept → protected → importance → shorter first), with a
+   count cap by load level (`maxImportantByWorkload`: low 8 · medium 5 · high 3). The rest become optional "bonus
+   today".
+3. Quests of ≤ 5 minutes never count against caps. Side quests get the leftover minutes (`sideQuestsByWorkload` low 4 ·
+   medium 2 · high 1 is the upper bound).
+
+Modes: **keep_all** skips steps 1–2. **push** skips them and adds 45 minutes of side-quest room. A quest you **kept**
+returns to its original tier (`baseTier`) and is never demoted again that day.
+
+**First-week ramp** (`rampLimits`): day 1 = 4 core (+ the first quest), 0 important, no routines/optional, ≤ 2 side
+quests, no challenge · days 2–3 = 6 core, 2 important, ≤ 3 side · days 4–7 = 8 core, 4 important, ≤ 4 side · then
+no limits.
+
+**Difficulty state** (each morning, from the capacity-based load score):
 
 | State | When | Effect |
 | --- | --- | --- |
-| Critical | HP < 25, or energy < 25, or workload ≥ 88 with energy < 40 | no side quests or challenge, core only |
-| Overloaded | workload ≥ 70, or energy < 35, or 7-day completion < 50%, or ≥ 4 core quests missed in 3 days | max 1 side quest of ≤ 10 min |
-| Too easy | 7-day completion ≥ 90%, workload < 45 and energy ≥ 60 | +2 side quests, +15 min max duration, rarer challenge |
+| Critical | HP < 25, or energy < 25, or load ≥ 88 with energy < 40 | no side quests or challenge, core only |
+| Overloaded | load ≥ 70, or energy < 35, or 7-day completion < 50%, or ≥ 4 core quests missed in 3 days | max 1 side quest of ≤ 10 min, important cap −2 |
+| Too easy | 7-day completion ≥ 90%, load < 45 and energy ≥ 60 | +2 side quests, +15 min max duration, rarer challenge |
 | Balanced | otherwise | defaults |
 
 ## 9. Habit learning & suggestions
 
 - `learnTimes` finds the median real completion time for recurring quests (you can correct the actual time after
   completing). With ≥ 5 samples, a tight spread, and ≥ 45 min away from the planned time, it proposes moving the quest.
+- **Step calibration:** if you said "not sure" about your steps, after 5 logged days the game proposes a target just above
+  your real average (rounded to 250, within the safety floor/ceiling).
 - All suggestions (weights, cardio stage, steps, calories, times, deload, rest day) go to the `suggestions` table and show
   up as **YES/NO cards**. Declines are remembered per suggestion key, so the same proposal doesn't come back right away.

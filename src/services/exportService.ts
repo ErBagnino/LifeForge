@@ -64,6 +64,7 @@ const TABLE_SCHEMAS: Record<TableName, z.ZodType> = {
   suggestions: keyed('id'),
   notifications: keyed('id'),
   ledger: keyed('id'),
+  meals: z.array(z.looseObject({ id: z.string(), date: isoDate, name: z.string(), kcal: z.number(), protein: z.number() })),
 };
 
 const EnvelopeSchema = z.object({

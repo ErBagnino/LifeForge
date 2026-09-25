@@ -1,14 +1,10 @@
 import type { DaySchedule, SafetyBounds, Settings } from '@/types';
+import { migrateWork } from '@/domain/schedule';
 import { DEFAULT_RULES } from './defaultRules';
 
-const workday = (trainingAvailable: boolean): DaySchedule => ({
-  type: 'work',
-  work: { start: '09:00', end: '19:00', label: 'Work' },
-  busy: [],
-  trainingAvailable,
-});
+export const SETTINGS_SCHEMA_VERSION = 2;
 
-const freeday = (): DaySchedule => ({ type: 'free', busy: [], trainingAvailable: true });
+const openDay = (): DaySchedule => ({ busy: [], trainingAvailable: true });
 
 export const DEFAULT_SAFETY: SafetyBounds = {
   maxStepIncreasePct: 5,
@@ -49,11 +45,18 @@ export function createDefaultSettings(): Settings {
     reducedMotion: 'system',
     haptics: true,
     dayStartHour: 4,
+    // Wake/sleep are planning estimates until the player sets them (see `known`).
     schedule: {
       wake: '07:00',
       sleep: '23:30',
-      days: [freeday(), workday(true), workday(false), workday(true), workday(false), workday(true), freeday()],
+      days: Array.from({ length: 7 }, openDay),
     },
+    // No assumptions about work: it stays "not set" until the player says otherwise.
+    work: { status: 'not_set', schedules: [] },
+    known: { wake: 'not_set', sleep: 'not_set', training: 'not_set', steps: 'not_set', height: 'set', weight: 'set', goals: 'not_set' },
+    exceptions: [],
+    load: { mode: 'auto' },
+    coach: { voiceLang: '', ai: { enabled: false, model: '' } },
     nutrition: { calories: 1800, protein: 150, fat: 55, carbs: 175 },
     body: { weightKg: 74, heightCm: 170, goal: 'lose' },
     steps: { min: 5500, ideal: 6500, stretch: 8500 },
@@ -89,6 +92,7 @@ export function createDefaultSettings(): Settings {
     onboarded: false,
     devMode: false,
     clockOffsetMs: 0,
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
     updatedAt: Date.now(),
   };
 }
@@ -111,7 +115,14 @@ export function deepFill<T>(value: unknown, defaults: T): T {
  */
 export function normalizeSettings(stored: Settings): Settings {
   const defaults = createDefaultSettings();
+  const version = (stored as Partial<Settings>).schemaVersion ?? 1;
   const merged = deepFill(stored, defaults);
+  if (version < 2) {
+    merged.work = migrateWork(stored.schedule?.days, stored.updatedAt ?? 0);
+    merged.schedule = { ...merged.schedule, days: merged.schedule.days.map((d) => ({ busy: d.busy ?? [], trainingAvailable: d.trainingAvailable ?? true })) };
+    if (stored.onboarded) merged.known = { ...merged.known, wake: 'set', sleep: 'set', training: 'set', steps: 'set', goals: 'set' };
+    merged.schemaVersion = SETTINGS_SCHEMA_VERSION;
+  }
   const ids = new Set(merged.rules.smartRules.map((r) => r.id));
   merged.rules.smartRules = [...merged.rules.smartRules, ...defaults.rules.smartRules.filter((r) => !ids.has(r.id))];
   return merged;

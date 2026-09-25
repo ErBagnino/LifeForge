@@ -30,6 +30,8 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --tabbar-h: 58px;
+  /* Height covered by the on-screen keyboard (set by useKeyboardInset). */
+  --kb: 0px;
   color-scheme: light;
 }
 
@@ -172,6 +174,27 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
+  /* Bottom padding that clears the home indicator, or the keyboard when it is open. */
+  .pb-kb {
+    padding-bottom: max(calc(var(--safe-bottom) + 12px), calc(var(--kb) + 12px));
+  }
+  /* Expands the touch area to 44×44 without changing the visual size. */
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+html.kb-open .hide-on-kb {
+  display: none;
 }
 
 @keyframes lf-flicker {

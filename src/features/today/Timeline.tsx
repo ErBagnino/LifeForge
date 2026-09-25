@@ -14,10 +14,12 @@ export function Timeline({ quests, plan, now, dayStartHour, petName, onOpen }: {
   const { items, anytime } = useMemo(() => {
     const list: Item[] = [];
     const g = (hm: string) => gameMinutes(hm, dayStartHour);
-    list.push({ kind: 'block', at: g(plan.wake), end: g(plan.wake), label: 'Wake up', icon: '⏰' });
+    list.push({ kind: 'block', at: g(plan.wake), end: g(plan.wake), label: plan.wakeEstimated ? 'Wake up (estimated)' : 'Wake up', icon: '⏰' });
     if (plan.work) list.push({ kind: 'block', at: g(plan.work.start), end: g(plan.work.end), label: plan.work.label ?? 'Work', icon: '💼' });
+    else if (plan.workStart) list.push({ kind: 'block', at: g(plan.workStart), end: g(plan.workStart), label: 'Work starts · end not set', icon: '💼' });
+    else if (plan.workEnd) list.push({ kind: 'block', at: g(plan.workEnd), end: g(plan.workEnd), label: 'Work ends', icon: '💼' });
     for (const b of plan.busy) list.push({ kind: 'block', at: g(b.start), end: g(b.end), label: b.label ?? 'Busy', icon: '📌' });
-    list.push({ kind: 'block', at: g(plan.sleep), end: g(plan.sleep), label: 'Bedtime', icon: '🌙' });
+    list.push({ kind: 'block', at: g(plan.sleep), end: g(plan.sleep), label: plan.sleepEstimated ? 'Bedtime (estimated)' : 'Bedtime', icon: '🌙' });
     const anytime: Quest[] = [];
     for (const q of quests) {
       if (q.hidden && q.status !== 'completed') continue;

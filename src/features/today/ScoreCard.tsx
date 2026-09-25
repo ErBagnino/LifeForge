@@ -12,8 +12,7 @@ export function ScoreCard() {
   const [open, setOpen] = useState(false);
   const score = log?.score ?? 0;
   const grade = scoreGrade(score);
-  const done = (log?.core.done ?? 0) + (log?.important.done ?? 0) + (log?.optional.done ?? 0);
-  const total = (log?.core.total ?? 0) + (log?.important.total ?? 0) + (log?.optional.total ?? 0);
+  const coreLeft = (log?.core.total ?? 0) - (log?.core.done ?? 0);
 
   return (
     <Card className="mt-4" onClick={() => setOpen((v) => !v)} aria-label={`Today score ${score} of 100. Tap for breakdown`}>
@@ -35,7 +34,7 @@ export function ScoreCard() {
             <TierRow label="Side" done={log?.optional.done ?? 0} total={log?.optional.total ?? 0} color="var(--lf-success)" />
           </div>
           <div className="num mt-1.5 text-[12px] text-muted">
-            {done}/{total} quests · streak line {threshold}
+            {coreLeft > 0 ? `${coreLeft} core left` : log?.core.total ? 'Core done ✓' : 'No core today'} · streak line {threshold}
           </div>
         </div>
       </div>

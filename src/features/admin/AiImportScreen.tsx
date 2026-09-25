@@ -94,7 +94,7 @@ export default function AiImportScreen() {
                   <div className="flex items-center gap-2">
                     <Toggle checked={!!selected[a.id]} onChange={(val) => setSelected({ ...selected, [a.id]: val })} label={`Import ${a.name}`} />
                     <span className="text-[22px]">{a.icon}</span>
-                    <TextInput value={a.name} onChange={(val) => update({ name: val })} aria-label="Name" className="!h-10" />
+                    <TextInput value={a.name} onChange={(val) => update({ name: val })} aria-label="Name" className="!h-11" />
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     <Chip>{describeRecurrence(a)}</Chip>
@@ -104,10 +104,10 @@ export default function AiImportScreen() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Category">
-                      <Select value={a.category} onChange={(val) => update({ category: val })} options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_INFO[c].label }))} aria-label="Category" className="!h-10" />
+                      <Select value={a.category} onChange={(val) => update({ category: val })} options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_INFO[c].label }))} aria-label="Category" className="!h-11" />
                     </Field>
                     <Field label="Difficulty">
-                      <NumberInput value={a.difficulty} onChange={(val) => update({ difficulty: Math.min(5, Math.max(1, Math.round(val))) as typeof a.difficulty })} aria-label="Difficulty" className="!h-10" />
+                      <NumberInput value={a.difficulty} onChange={(val) => update({ difficulty: Math.min(5, Math.max(1, Math.round(val))) as typeof a.difficulty })} aria-label="Difficulty" className="!h-11" />
                     </Field>
                   </div>
                   {d.warnings.map((w, k) => (

@@ -1,8 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Field, List, NumberInput, Row, Segmented, Select, TextInput, TimeInput, Toggle } from '@/components/ui/forms';
-import { Icon } from '@/components/ui/Icon';
 import { Button, Card, Chip, SectionTitle } from '@/components/ui/primitives';
 import { Dialog } from '@/components/ui/Sheet';
 import { ACCENTS } from '@/data/cosmetics';
@@ -16,6 +15,10 @@ import { devTestNotification } from '@/services/devService';
 import { notificationService } from '@/services/notifications/NotificationService';
 import { rescheduleReminders } from '@/services/notifications/reminderScheduler';
 import { useGame } from '@/store/gameStore';
+import { SchedulePanel } from './SchedulePanel';
+import { CoachPanel } from './CoachPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { goalLabel, profileFields } from '@/domain/profile';
 import type { CoachTone, GameDifficulty, NotificationType, Settings, ThemeMode } from '@/types';
 
 function useSettingsUpdater() {
@@ -43,6 +46,7 @@ const TITLES: Record<string, string> = {
   safety: 'Safety bounds',
   notifications: 'Notifications',
   data: 'Data',
+  coach: 'Coach & AI',
 };
 
 export default function SettingsSection() {
@@ -58,6 +62,7 @@ export default function SettingsSection() {
     safety: <SafetyPanel />,
     notifications: <NotificationsPanel />,
     data: <DataPanel />,
+    coach: <CoachPanel />,
   };
   return (
     <Screen back="/settings" title={TITLES[section] ?? 'Settings'}>
@@ -66,25 +71,68 @@ export default function SettingsSection() {
   );
 }
 
+const GOAL_CHOICES = ['strength', 'fat_loss', 'muscle', 'endurance', 'routine', 'nofap', 'screen', 'sleep', 'nutrition', 'order', 'learning', 'mind', 'pet'];
+const FITNESS_GOAL_IDS = new Set(['strength', 'fat_loss', 'muscle', 'endurance']);
+
 function ProfilePanel() {
   const { settings, update } = useSettingsUpdater();
+  const navigate = useNavigate();
   const [p, setP] = useState(settings.profile);
+  const fields = profileFields(settings, clock.today());
+  const toggleGoal = (g: string) => setP({ ...p, goals: p.goals.includes(g) ? p.goals.filter((x) => x !== g) : [...p.goals, g] });
   return (
-    <div className="mt-3 space-y-3">
-      <Field label="Nickname">
-        <TextInput value={p.nickname} onChange={(v) => setP({ ...p, nickname: v, name: v })} aria-label="Nickname" />
-      </Field>
-      <div className="grid grid-cols-[1fr_90px] gap-2">
-        <Field label="Pet name">
-          <TextInput value={p.petName} onChange={(v) => setP({ ...p, petName: v })} aria-label="Pet name" />
+    <div className="mt-3">
+      <List title="Your info" footer="Not set is fine — the game works with what it knows. Add things when they become useful, here or by telling the Coach.">
+        {fields.map((f) => (
+          <Row
+            key={f.key}
+            icon={f.icon}
+            title={f.label}
+            subtitle={f.status === 'not_set' && f.hint ? `${f.value} · ${f.hint}` : f.value}
+            right={<StatusBadge status={f.status} />}
+            onClick={f.edit === 'profile' ? undefined : () => navigate(`/settings/${f.edit}`)}
+          />
+        ))}
+      </List>
+
+      <SectionTitle>Edit profile</SectionTitle>
+      <div className="space-y-3">
+        <Field label="Nickname">
+          <TextInput value={p.nickname} onChange={(v) => setP({ ...p, nickname: v, name: v })} aria-label="Nickname" />
         </Field>
-        <Field label="Pet icon">
-          <TextInput value={p.petEmoji} onChange={(v) => setP({ ...p, petEmoji: v.slice(0, 4) })} aria-label="Pet emoji" />
+        <Field label="Main goals">
+          <div className="flex flex-wrap gap-2">
+            {GOAL_CHOICES.map((g) => (
+              <button key={g} type="button" aria-pressed={p.goals.includes(g)} onClick={() => toggleGoal(g)} className={p.goals.includes(g) ? 'h-11 rounded-full bg-accent px-4 text-[14px] font-semibold text-on-accent' : 'h-11 rounded-full bg-surface px-4 text-[14px] font-semibold shadow-card'}>
+                {goalLabel(g)}
+              </button>
+            ))}
+          </div>
         </Field>
+        <Field label="Future goals (optional)">
+          <TextInput value={p.futureGoals ?? ''} onChange={(v) => setP({ ...p, futureGoals: v })} placeholder="e.g. run a 10k next spring" aria-label="Future goals" />
+        </Field>
+        <div className="grid grid-cols-[1fr_90px] gap-2">
+          <Field label="Pet name">
+            <TextInput value={p.petName} onChange={(v) => setP({ ...p, petName: v })} aria-label="Pet name" />
+          </Field>
+          <Field label="Pet icon">
+            <TextInput value={p.petEmoji} onChange={(v) => setP({ ...p, petEmoji: v.slice(0, 4) })} aria-label="Pet emoji" />
+          </Field>
+        </div>
+        <Button
+          block
+          size="lg"
+          onClick={() =>
+            void update({
+              profile: { ...p, petName: p.petName.trim() || 'Sky', futureGoals: p.futureGoals?.trim() || undefined, fitnessGoals: p.goals.filter((g) => FITNESS_GOAL_IDS.has(g)) },
+              known: { ...settings.known, goals: p.goals.length ? 'set' : 'not_set' },
+            })
+          }
+        >
+          Save
+        </Button>
       </div>
-      <Button block size="lg" onClick={() => void update({ profile: { ...p, petName: p.petName.trim() || 'Sky' } })}>
-        Save
-      </Button>
     </div>
   );
 }
@@ -139,7 +187,7 @@ function AppearancePanel() {
                 { value: 'off', label: 'Off' },
               ]}
               aria-label="Reduced motion"
-              className="!h-10 w-[120px]"
+              className="!h-11 w-[120px]"
             />
           }
         />
@@ -180,86 +228,18 @@ function GamePanel() {
         Rewards ×{settings.rules.difficultyPresets[settings.difficulty].rewardMultiplier} · penalties ×{settings.rules.difficultyPresets[settings.difficulty].penaltyMultiplier} · streak line {settings.rules.difficultyPresets[settings.difficulty].streakThreshold}. Always adaptive: heavy days are protected.
       </Card>
       <List title="Coach">
-        <Row title="Tone" right={<Select value={settings.tone} onChange={(v) => void update({ tone: v })} options={TONES} aria-label="Coach tone" className="!h-10 w-[180px]" />} />
+        <Row title="Tone" right={<Select value={settings.tone} onChange={(v) => void update({ tone: v })} options={TONES} aria-label="Coach tone" className="!h-11 w-[180px]" />} />
       </List>
       <List title="Day">
         <Row
           title="New day starts at"
           subtitle="Activities before this hour count for the previous day"
           right={
-            <Select value={settings.dayStartHour} onChange={(v) => void update({ dayStartHour: v })} options={[2, 3, 4, 5, 6].map((h) => ({ value: h, label: `${h}:00` }))} aria-label="Day start hour" className="!h-10 w-[100px]" />
+            <Select value={settings.dayStartHour} onChange={(v) => void update({ dayStartHour: v })} options={[2, 3, 4, 5, 6].map((h) => ({ value: h, label: `${h}:00` }))} aria-label="Day start hour" className="!h-11 w-[100px]" />
           }
         />
       </List>
     </>
-  );
-}
-
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-function SchedulePanel() {
-  const { settings, update } = useSettingsUpdater();
-  const [s, setS] = useState(settings.schedule);
-  const setDay = (i: number, patch: Partial<(typeof s.days)[number]>) => setS({ ...s, days: s.days.map((d, j) => (j === i ? { ...d, ...patch } : d)) });
-  return (
-    <div className="mt-3">
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="Wake up">
-          <TimeInput value={s.wake} onChange={(v) => setS({ ...s, wake: v })} aria-label="Wake up" />
-        </Field>
-        <Field label="Bedtime">
-          <TimeInput value={s.sleep} onChange={(v) => setS({ ...s, sleep: v })} aria-label="Bedtime" />
-        </Field>
-      </div>
-      {[1, 2, 3, 4, 5, 6, 0].map((i) => {
-        const d = s.days[i];
-        return (
-          <Card key={i} className="mt-2 !p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-bold">{DAY_NAMES[i]}</span>
-              <Segmented
-                size="sm"
-                className="w-[170px]"
-                value={d.type}
-                onChange={(v) => setDay(i, { type: v, work: v === 'work' ? (d.work ?? { start: '09:00', end: '18:00', label: 'Work' }) : undefined })}
-                options={[
-                  { value: 'work', label: '💼 Work' },
-                  { value: 'free', label: '🌤️ Free' },
-                ]}
-              />
-            </div>
-            {d.type === 'work' && d.work && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <TimeInput value={d.work.start} onChange={(v) => setDay(i, { work: { ...d.work!, start: v } })} aria-label={`${DAY_NAMES[i]} work start`} />
-                <TimeInput value={d.work.end} onChange={(v) => setDay(i, { work: { ...d.work!, end: v } })} aria-label={`${DAY_NAMES[i]} work end`} />
-              </div>
-            )}
-            {d.busy.map((b, bi) => (
-              <div key={bi} className="mt-2 flex items-center gap-2">
-                <TimeInput value={b.start} onChange={(v) => setDay(i, { busy: d.busy.map((x, k) => (k === bi ? { ...x, start: v } : x)) })} aria-label="Busy start" />
-                <TimeInput value={b.end} onChange={(v) => setDay(i, { busy: d.busy.map((x, k) => (k === bi ? { ...x, end: v } : x)) })} aria-label="Busy end" />
-                <button type="button" aria-label="Remove busy block" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface-2" onClick={() => setDay(i, { busy: d.busy.filter((_, k) => k !== bi) })}>
-                  <Icon name="trash" size={16} />
-                </button>
-              </div>
-            ))}
-            <div className="mt-2 flex items-center justify-between">
-              <button type="button" className="text-[13px] font-semibold text-accent" onClick={() => setDay(i, { busy: [...d.busy, { start: '18:00', end: '19:00', label: 'Busy' }] })}>
-                + Recurring busy block
-              </button>
-              <label className="flex items-center gap-2 text-[13px]">
-                Training
-                <Toggle checked={d.trainingAvailable} onChange={(v) => setDay(i, { trainingAvailable: v })} label={`${DAY_NAMES[i]} training available`} />
-              </label>
-            </div>
-          </Card>
-        );
-      })}
-      <Button block size="lg" className="mt-4" onClick={() => void update({ schedule: s })}>
-        Save schedule
-      </Button>
-      <p className="mt-2 px-1 text-[12px] text-muted">Applies from the next day. Adjust just today from the Today screen (tap the day chip).</p>
-    </div>
   );
 }
 
@@ -330,7 +310,23 @@ function TargetsPanel() {
         <ToggleRow title="Sleep tracking" subtitle="Sets daily Energy" checked={s.tracking.sleep} onChange={(v) => setS({ ...s, tracking: { ...s.tracking, sleep: v } })} />
         <ToggleRow title="Cardio program" subtitle="Walk → run progression quests" checked={s.cardio.enabled} onChange={(v) => setS({ ...s, cardio: { ...s.cardio, enabled: v } })} />
       </List>
-      <Button block size="lg" className="mt-4" onClick={() => void update({ nutrition: s.nutrition, body: s.body, steps: s.steps, hydration: s.hydration, leisure: s.leisure, tracking: s.tracking, cardio: s.cardio })}>
+      <Button block size="lg" className="mt-4" onClick={() =>
+          void update({
+            nutrition: s.nutrition,
+            body: s.body,
+            steps: s.steps,
+            hydration: s.hydration,
+            leisure: s.leisure,
+            tracking: s.tracking,
+            cardio: s.cardio,
+            known: {
+              ...settings.known,
+              height: s.body.heightCm !== settings.body.heightCm || settings.known.height === 'set' ? 'set' : settings.known.height,
+              weight: s.body.weightKg !== settings.body.weightKg || settings.known.weight === 'set' ? 'set' : settings.known.weight,
+              steps: s.steps.ideal !== settings.steps.ideal || settings.known.steps === 'set' ? 'set' : settings.known.steps,
+            },
+          })
+        }>
         Save targets
       </Button>
     </div>

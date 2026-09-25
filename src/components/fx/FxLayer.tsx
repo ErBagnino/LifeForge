@@ -343,7 +343,7 @@ export function FxLayer() {
 
   return createPortal(
     <>
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-[70] mx-auto flex max-w-[560px] flex-col gap-2 px-3 pt-[calc(var(--safe-top)+8px)]" aria-live="polite">
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[70] mx-auto flex max-w-[640px] flex-col gap-2 px-3 pt-[calc(var(--safe-top)+8px)]" aria-live="polite">
         <AnimatePresence initial={false}>
           {toasts.map((t) => (
             <motion.div
