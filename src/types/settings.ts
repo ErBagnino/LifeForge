@@ -53,6 +53,16 @@ export interface HydrationSettings {
   glassMl: number;
 }
 
+export type LeisureKind = 'games' | 'short_video' | 'streaming' | 'social' | 'other';
+
+export interface LeisureSettings {
+  enabled: boolean;
+  /** Daily budget in minutes. */
+  dailyLimitMin: number;
+  /** Warn when this share of the budget is used. */
+  warnAtPct: number;
+}
+
 export interface CardioSettings {
   enabled: boolean;
   stageIndex: number;
@@ -68,7 +78,8 @@ export type NotificationType =
   | 'achievement'
   | 'levelUp'
   | 'streak'
-  | 'challenge';
+  | 'challenge'
+  | 'leisure';
 
 export interface NotificationSettings {
   enabled: boolean;
@@ -154,6 +165,7 @@ export interface GeneratorRules {
   sideQuestsByWorkload: Record<WorkloadLevel, number>;
   maxDurationByWorkload: Record<WorkloadLevel, number>;
   maxCoreByWorkload: Record<WorkloadLevel, number>;
+  maxImportantByWorkload: Record<WorkloadLevel, number>;
   recencyDays: number;
   challengeEnabled: boolean;
   hiddenEnabled: boolean;
@@ -285,6 +297,7 @@ export interface Settings {
   steps: StepTargets;
   hydration: HydrationSettings;
   cardio: CardioSettings;
+  leisure: LeisureSettings;
   tracking: TrackingSettings;
   notifications: NotificationSettings;
   rules: GameRules;

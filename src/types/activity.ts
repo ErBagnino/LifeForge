@@ -60,6 +60,8 @@ export interface Activity {
   unit?: string;
   /** When set, quest progress follows the logged metric automatically. */
   metric?: MetricType;
+  /** 'atMost' = stay under the target (e.g. play-time budget). Default 'atLeast'. */
+  metricMode?: 'atLeast' | 'atMost';
   /** Overrides for the centrally computed values. */
   baseXp?: number;
   baseCoins?: number;

@@ -24,7 +24,7 @@ export interface PropDef {
   kind: PropKind;
   /** For cables: the pulley position. */
   anchor?: Vec;
-  /** For bars: width. */
+  /** For bars: width. For platforms: non-zero draws a sled rail to the floor. */
   width?: number;
   /** For platforms: surface angle. */
   angle?: number;
@@ -204,12 +204,12 @@ export const POSES: Record<string, IllustrationDef> = {
       side({ hip: [55, 72], torso: 130, facing: 1, armN: [-70, -30], armF: [-70, -30], legN: [80, -20], legF: [82, -18], footN: 120, footF: 120, ground: false }),
       side({ hip: [55, 72], torso: 130, facing: 1, armN: [-70, -30], armF: [-70, -30], legN: [32, 28], legF: [33, 29], footN: 120, footF: 120, ground: false }),
     ],
-    props: [{ kind: 'seat_back' }, { kind: 'platform', angle: 120 }],
+    props: [{ kind: 'seat' }, { kind: 'seat_back' }, { kind: 'platform', angle: 120, width: 1 }],
   },
   rdl: {
     poses: [
       stand({ armN: [-90, -90], armF: [-90, -90] }),
-      side({ hip: [36, 58], torso: 35, armN: [-90, -90], armF: [-90, -90], legN: [-50, -92], legF: [-52, -94] }),
+      side({ hip: [42, 60], torso: 18, armN: [-90, -90], armF: [-90, -90], legN: [-66, -90], legF: [-68, -92] }),
     ],
     props: [{ kind: 'barbell' }],
   },

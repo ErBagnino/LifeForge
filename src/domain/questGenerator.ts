@@ -147,10 +147,7 @@ export function generateSideQuests(input: GeneratorInput): GeneratedQuestSpec[] 
     weight *= 1 + Math.min(completed, 5) * 0.06;
 
     weight *= difficultyFit(a.difficulty, input.state);
-    if (input.state === 'too_easy' && a.difficulty >= 3 && reasonScore < 1) {
-      reason = "You're cruising — here's something with teeth";
-      reasonScore = 1;
-    }
+    if (input.state === 'too_easy' && a.difficulty >= 3 && reasonScore < 1) reason = "You're cruising — here's something with teeth";
     weight *= timeFit(a, input.timeOfDay);
     weight *= 0.75 + rand() * 0.5;
 

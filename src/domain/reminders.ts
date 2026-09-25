@@ -35,6 +35,7 @@ const PRIORITY: Record<NotificationType, number> = {
   recap: 60,
   achievement: 30,
   levelUp: 30,
+  leisure: 95,
 };
 
 /** Build today's candidate reminders. The governor decides which actually fire. */

@@ -59,6 +59,7 @@ export function createDefaultSettings(): Settings {
     steps: { min: 5500, ideal: 6500, stretch: 8500 },
     hydration: { targetMl: 2250, glassMl: 250 },
     cardio: { enabled: true, stageIndex: 0 },
+    leisure: { enabled: true, dailyLimitMin: 90, warnAtPct: 80 },
     tracking: { nutrition: true, weight: true, sleep: true },
     notifications: {
       enabled: false,
@@ -72,6 +73,7 @@ export function createDefaultSettings(): Settings {
         levelUp: true,
         streak: true,
         challenge: true,
+        leisure: true,
       },
       maxPerDay: 6,
       minGapMin: 45,
@@ -89,4 +91,28 @@ export function createDefaultSettings(): Settings {
     clockOffsetMs: 0,
     updatedAt: Date.now(),
   };
+}
+
+type Plain = Record<string, unknown>;
+const isPlain = (v: unknown): v is Plain => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Fill missing keys from defaults (recursively). Arrays and user values are kept as-is. */
+export function deepFill<T>(value: unknown, defaults: T): T {
+  if (!isPlain(defaults)) return (value === undefined ? defaults : value) as T;
+  if (!isPlain(value)) return defaults;
+  const out: Plain = { ...value };
+  for (const [k, d] of Object.entries(defaults as Plain)) out[k] = k in value ? deepFill(value[k], d) : d;
+  return out as T;
+}
+
+/**
+ * Bring stored settings up to date after an app update: new fields get defaults,
+ * new default smart rules are appended, user edits are preserved.
+ */
+export function normalizeSettings(stored: Settings): Settings {
+  const defaults = createDefaultSettings();
+  const merged = deepFill(stored, defaults);
+  const ids = new Set(merged.rules.smartRules.map((r) => r.id));
+  merged.rules.smartRules = [...merged.rules.smartRules, ...defaults.rules.smartRules.filter((r) => !ids.has(r.id))];
+  return merged;
 }

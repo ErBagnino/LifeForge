@@ -65,6 +65,7 @@ export interface Quest {
   unit?: string;
   progress: number;
   metric?: MetricType;
+  metricMode?: 'atLeast' | 'atMost';
   goal?: QuestGoal;
   durationMin: number;
   scheduledTime?: TimeHM;
@@ -80,6 +81,8 @@ export interface Quest {
   reason?: string;
   hidden?: boolean;
   hint?: string;
+  /** What completing this quest actually granted (enables undo and history). */
+  earned?: { xp: number; coins: number; hp: number; energy: number };
   /** Private quests use discreet text in notifications. */
   private?: boolean;
   /** True when the workload engine demoted the quest to protect the day. */

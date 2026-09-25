@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeWorkload, dayCapacity, freeMinutesUntilNextBlock, activeBlock } from '../workload';
-import { computeDifficultyState, coreCap, selectDemotions, sideQuestBudget } from '../adaptive';
+import { computeDifficultyState, coreCap, importantCap, selectDemotions, sideQuestBudget } from '../adaptive';
 import { generateSideQuests, rollRarity, scaleActivity } from '../questGenerator';
 import { pickNextAction } from '../nextAction';
 import { evaluateRules } from '../rulesEngine';
@@ -65,13 +65,25 @@ describe('adaptive difficulty', () => {
     expect(b.count).toBeLessThanOrEqual(1);
   });
 
-  it('caps core quests on heavy workdays by importance', () => {
-    expect(coreCap('high', 'balanced', rules.generator)).toBe(5);
+  it('caps effortful core quests on heavy workdays by importance', () => {
+    expect(coreCap('high', 'balanced', rules.generator)).toBe(4);
+    expect(coreCap('high', 'critical', rules.generator)).toBeLessThanOrEqual(3);
+    expect(importantCap('high', 'critical', rules.generator)).toBe(0);
     const quests = [5, 4, 3, 2, 1, 5, 4].map((importance, i) => ({ id: `q${i}`, tier: 'core' as const, importance: importance as 1 | 2 | 3 | 4 | 5, durationMin: 10 }));
     const demoted = selectDemotions(quests, 5);
     expect(demoted).toHaveLength(2);
     expect(demoted).toContain('q4');
     expect(demoted).toContain('q3');
+  });
+
+  it('never counts trivial quests and protects workouts', () => {
+    const quests = [
+      { id: 'brush', tier: 'core' as const, importance: 4 as const, durationMin: 3 },
+      { id: 'pet', tier: 'core' as const, importance: 5 as const, durationMin: 3 },
+      { id: 'workout', tier: 'core' as const, importance: 3 as const, durationMin: 60, protected: true },
+      { id: 'walk', tier: 'core' as const, importance: 5 as const, durationMin: 30 },
+    ];
+    expect(selectDemotions(quests, 1)).toEqual(['walk']);
   });
 });
 

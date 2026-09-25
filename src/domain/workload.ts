@@ -32,16 +32,16 @@ export interface WorkloadResult {
 }
 
 /**
- * Day load 0–100. A 10h workday alone lands around 55 ("medium"); adding a workout and a
- * long quest list pushes it into "high", which protects the core and trims side quests.
+ * Day load 0–100. A 10h workday alone lands around 50–55 ("medium"); a workout, a long quest
+ * list, busy blocks or low energy push it into "high", which protects the core and trims side quests.
  */
 export function computeWorkload(input: WorkloadInput): WorkloadResult {
   const { capacity } = input;
-  const work = (capacity.workMin / 600) * 55;
+  const work = (capacity.workMin / 600) * 50;
   const busy = (capacity.busyMin / 60) * 6;
   const questShare = capacity.freeMin > 0 ? input.questMinutes / capacity.freeMin : 1;
-  const quests = clamp(questShare, 0, 1.5) * 25;
-  const workout = input.workoutScheduled ? 6 : 0;
+  const quests = clamp(questShare, 0, 1.5) * 20;
+  const workout = input.workoutScheduled ? 5 : 0;
   const fatigue = input.energyStart < 50 ? ((50 - input.energyStart) / 50) * 15 : 0;
   const score = Math.round(clamp(work + busy + quests + workout + fatigue, 0, 100));
   return {

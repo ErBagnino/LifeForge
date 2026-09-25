@@ -106,16 +106,14 @@ export function solvePose(pose: Pose): Skeleton {
     sk = { view: 'front', facing: 1, hip, neck, head, arms, legs, feet };
   }
   if (pose.ground !== false) {
-    const points = [
-      ...sk.arms.flatMap((a) => [a.mid, a.end]),
-      ...sk.legs.flatMap((l) => [l.mid, l.end]),
-      ...sk.feet,
-      sk.hip,
-      sk.neck,
-    ];
-    const lowest = Math.max(...points.map((p) => p[1])) + 1.8;
-    const lowestHead = sk.head[1] + BONES.head;
-    const dy = FLOOR_Y - Math.max(lowest, lowestHead);
+    const limbPoints = [...sk.arms.flatMap((a) => [a.mid, a.end]), ...sk.legs.flatMap((l) => [l.mid, l.end]), ...sk.feet];
+    const lowest = Math.max(
+      ...limbPoints.map((p) => p[1] + 2.8),
+      sk.hip[1] + 4.5,
+      sk.neck[1] + 4.5,
+      sk.head[1] + BONES.head,
+    );
+    const dy = FLOOR_Y - lowest;
     sk = translate(sk, 0, dy);
   }
   return sk;

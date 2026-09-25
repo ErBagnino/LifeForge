@@ -151,11 +151,28 @@ describe('recurrence', () => {
     expect(isDueOn(makeActivity({ active: false }), ctx)).toBe(false);
   });
 
+  it('spreads first occurrences instead of flooding day one', () => {
+    const acts = Array.from({ length: 20 }, (_, i) => makeActivity({ id: `chore${i}`, recurrence: { type: 'timesPerWeek', times: 2 } }));
+    const dueMonday = acts.filter((a) => isDueOn(a, { ...ctx, date: '2026-09-21', daysLeftInWeek: 7 })).length;
+    expect(dueMonday).toBeGreaterThan(0);
+    expect(dueMonday).toBeLessThan(20);
+  });
+
+  it('chores wait for free days on workdays, cardio avoids strength days', () => {
+    const chore = makeActivity({ recurrence: { type: 'timesPerWeek', times: 1 } });
+    expect(isDueOn(chore, { ...ctx, lastCompletedDate: '2026-09-10', freeDaysLeftAfterToday: 2 })).toBe(false);
+    expect(isDueOn(chore, { ...ctx, lastCompletedDate: '2026-09-10', freeDaysLeftAfterToday: 0 })).toBe(true);
+    const cardio = makeActivity({ category: 'cardio', recurrence: { type: 'timesPerWeek', times: 3 } });
+    expect(isDueOn(cardio, { ...ctx, lastCompletedDate: '2026-09-10', workoutToday: true })).toBe(false);
+    expect(isDueOn(cardio, { ...ctx, lastCompletedDate: '2026-09-10', workoutToday: false })).toBe(true);
+  });
+
   it('times per week spaces occurrences and catches up at week end', () => {
     const shave = makeActivity({ recurrence: { type: 'timesPerWeek', times: 1 } });
     expect(isDueOn(shave, { ...ctx, completedThisWeek: 1 })).toBe(false);
     expect(isDueOn(shave, { ...ctx, lastCompletedDate: '2026-09-20' })).toBe(false);
     expect(isDueOn(shave, { ...ctx, lastCompletedDate: '2026-09-15' })).toBe(true);
+    expect(isDueOn(shave, { ...ctx, daysLeftInWeek: 1 })).toBe(true);
     const thrice = makeActivity({ recurrence: { type: 'timesPerWeek', times: 3 } });
     expect(isDueOn(thrice, { ...ctx, completedThisWeek: 1, lastCompletedDate: '2026-09-22', daysLeftInWeek: 2 })).toBe(true);
   });

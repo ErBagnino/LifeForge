@@ -1,0 +1,204 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --lf-bg: #f2f2f7;
+  --lf-surface: #ffffff;
+  --lf-surface-2: #f4f4f8;
+  --lf-surface-3: #e9e9ef;
+  --lf-text: #0b0b10;
+  --lf-muted: #6e6e7a;
+  --lf-faint: #a1a1ab;
+  --lf-border: rgba(10, 10, 20, 0.07);
+  --lf-accent: #ff5a1f;
+  --lf-accent-2: #ff8a3d;
+  --lf-on-accent: #ffffff;
+  --lf-xp: #7c5cff;
+  --lf-coin: #f5a400;
+  --lf-hp: #ff375f;
+  --lf-energy: #0aa8f5;
+  --lf-streak: #ff7a1a;
+  --lf-success: #28c76f;
+  --lf-warn: #ff9f0a;
+  --lf-danger: #ff3b30;
+  --lf-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 16px rgba(15, 15, 30, 0.04);
+  --lf-shadow-lg: 0 10px 40px rgba(15, 15, 30, 0.12);
+  --lf-tabbar: rgba(250, 250, 252, 0.82);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --tabbar-h: 58px;
+  color-scheme: light;
+}
+
+.dark {
+  --lf-bg: #000000;
+  --lf-surface: #151518;
+  --lf-surface-2: #1e1e23;
+  --lf-surface-3: #2a2a31;
+  --lf-text: #f5f5f7;
+  --lf-muted: #9d9daa;
+  --lf-faint: #62626d;
+  --lf-border: rgba(255, 255, 255, 0.08);
+  --lf-xp: #9580ff;
+  --lf-coin: #ffc233;
+  --lf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --lf-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --lf-tabbar: rgba(18, 18, 22, 0.82);
+  color-scheme: dark;
+}
+
+[data-accent='ocean'] { --lf-accent: #0a84ff; --lf-accent-2: #40a3ff; }
+[data-accent='forest'] { --lf-accent: #22a55a; --lf-accent-2: #3cc473; }
+[data-accent='grape'] { --lf-accent: #8e5cff; --lf-accent-2: #a883ff; }
+[data-accent='rose'] { --lf-accent: #ff375f; --lf-accent-2: #ff6482; }
+[data-accent='mono'] { --lf-accent: #3a3a40; --lf-accent-2: #6e6e76; }
+.dark[data-accent='mono'] { --lf-accent: #e5e5ea; --lf-accent-2: #c7c7cc; --lf-on-accent: #000; }
+[data-accent='gold'] { --lf-accent: #d49a00; --lf-accent-2: #f0b92b; }
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-rounded: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --color-bg: var(--lf-bg);
+  --color-surface: var(--lf-surface);
+  --color-surface-2: var(--lf-surface-2);
+  --color-surface-3: var(--lf-surface-3);
+  --color-fg: var(--lf-text);
+  --color-muted: var(--lf-muted);
+  --color-faint: var(--lf-faint);
+  --color-line: var(--lf-border);
+  --color-accent: var(--lf-accent);
+  --color-accent-2: var(--lf-accent-2);
+  --color-on-accent: var(--lf-on-accent);
+  --color-xp: var(--lf-xp);
+  --color-coin: var(--lf-coin);
+  --color-hp: var(--lf-hp);
+  --color-energy: var(--lf-energy);
+  --color-streak: var(--lf-streak);
+  --color-success: var(--lf-success);
+  --color-warn: var(--lf-warn);
+  --color-danger: var(--lf-danger);
+  --shadow-card: var(--lf-shadow);
+  --shadow-float: var(--lf-shadow-lg);
+  --radius-4xl: 2rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--lf-bg);
+  }
+  body {
+    margin: 0;
+    background: var(--lf-bg);
+    color: var(--lf-text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.4;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    font-family: inherit;
+    color: inherit;
+  }
+  :focus-visible {
+    outline: 2px solid var(--lf-accent);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--lf-accent) 30%, transparent);
+  }
+}
+
+@layer utilities {
+  .num {
+    font-family: var(--font-rounded);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .pt-safe {
+    padding-top: var(--safe-top);
+  }
+  .pb-safe {
+    padding-bottom: var(--safe-bottom);
+  }
+  .pb-tabbar {
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 20px);
+  }
+  .px-safe {
+    padding-left: max(16px, var(--safe-left));
+    padding-right: max(16px, var(--safe-right));
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .glass {
+    background: var(--lf-tabbar);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+@keyframes lf-flicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); }
+  50% { transform: scale(1.08) rotate(2deg); }
+}
+.lf-flame {
+  animation: lf-flicker 1.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+  display: inline-block;
+}
+@keyframes lf-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.lf-skeleton {
+  background: linear-gradient(90deg, var(--lf-surface-2) 25%, var(--lf-surface-3) 37%, var(--lf-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: lf-shimmer 1.4s ease infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lf-flame,
+  .lf-skeleton {
+    animation: none;
+  }
+}
+.reduce-motion .lf-flame,
+.reduce-motion .lf-skeleton {
+  animation: none;
+}

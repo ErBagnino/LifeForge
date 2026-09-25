@@ -50,6 +50,9 @@ export const C = {
   weightLogs: 'weight.logs',
   sleepLogs: 'sleep.logs',
   restDays: 'rest.days',
+  leisureUnderDays: 'leisure.underDays',
+  leisureUnderRun: 'leisure.underRun',
+  leisureUnderRunBest: 'leisure.underRunBest',
   recoveryExits: 'recovery.exits',
   knockouts: 'recovery.knockouts',
   snoozes: 'snooze.total',
@@ -139,6 +142,10 @@ export interface DayCloseCounterInput {
   calorieTarget: number;
   previousPerfectRun: number;
   previousPerfectRunBest: number;
+  /** Daily play-time budget in minutes, when tracking is enabled. */
+  leisureLimit?: number;
+  previousLeisureRun?: number;
+  previousLeisureRunBest?: number;
 }
 
 /** Counter increments/sets applied when a day closes. Returns increments and absolute sets. */
@@ -162,6 +169,13 @@ export function countersForDayClose(input: DayCloseCounterInput): { inc: Counter
   const run = input.perfectCore ? input.previousPerfectRun + 1 : 0;
   set[C.perfectCoreRun] = run;
   set[C.perfectCoreRunBest] = Math.max(run, input.previousPerfectRunBest);
+  if (input.leisureLimit !== undefined) {
+    const under = (m.leisure ?? 0) <= input.leisureLimit;
+    if (under) add(inc, C.leisureUnderDays);
+    const lrun = under ? (input.previousLeisureRun ?? 0) + 1 : 0;
+    set[C.leisureUnderRun] = lrun;
+    set[C.leisureUnderRunBest] = Math.max(lrun, input.previousLeisureRunBest ?? 0);
+  }
   return { inc, set };
 }
 

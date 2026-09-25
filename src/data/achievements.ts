@@ -200,6 +200,12 @@ export const SEED_ACHIEVEMENTS: Achievement[] = [
   ach('mastery_90', 'Self-Mastery III', 'Keep your daily 🛡️ check-in streak for 90 days. Rewired.', 'consistency', '🧠', [C.actStreak('nofap'), 90], 'platinum'),
   ach('mastery_365', 'Iron Will', 'Keep your daily 🛡️ check-in streak for 365 days.', 'long_term', '🏔️', [C.actStreak('nofap'), 365], 'platinum'),
 
+  // Play-time budget
+  ach('screen_first', 'In Control', 'Stay within your daily play-time budget.', 'consistency', '🎮', [C.leisureUnderDays, 1]),
+  ach('screen_7', 'Screen Master', 'Stay within your play-time budget 7 days in a row.', 'consistency', '🕹️', [C.leisureUnderRunBest, 7], 'silver'),
+  ach('screen_30', 'Attention Reclaimed', 'Stay within your play-time budget 30 days in a row.', 'consistency', '🧠', [C.leisureUnderRunBest, 30], 'gold'),
+  ach('screen_100', 'Digital Monk', 'Stay within your play-time budget on 100 days.', 'long_term', '🧘', [C.leisureUnderDays, 100], 'platinum'),
+
   // Hidden
   ach('night_owl', 'Night Owl', 'Complete 10 quests after 23:00.', 'hidden', '🦉', [C.questsLate, 10], 'bronze', true),
   ach('weekend_warrior', 'Weekend Warrior', 'Complete 50 quests on weekends.', 'hidden', '🛡️', [C.questsWeekend, 50], 'silver', true),

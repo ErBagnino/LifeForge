@@ -114,10 +114,17 @@ export function sideQuestBudget(input: BudgetInput, rules: GeneratorRules): Side
   return { count, maxDuration, energyBudget, challengeBoost, challenge };
 }
 
-/** Max number of core quests for a day. A 10h workday keeps 3–5 realistic core quests. */
+/** Max number of effortful core quests for a day. A 10h workday keeps 3–5 realistic ones. */
 export function coreCap(workloadLevel: WorkloadLevel, state: DifficultyState, rules: GeneratorRules): number {
-  if (state === 'critical') return Math.min(4, rules.maxCoreByWorkload.high);
+  if (state === 'critical') return Math.min(3, rules.maxCoreByWorkload.high);
   return rules.maxCoreByWorkload[workloadLevel];
+}
+
+/** Max number of effortful important quests for a day. */
+export function importantCap(workloadLevel: WorkloadLevel, state: DifficultyState, rules: GeneratorRules): number {
+  if (state === 'critical') return 0;
+  const cap = rules.maxImportantByWorkload[workloadLevel];
+  return state === 'overloaded' ? Math.max(1, cap - 2) : cap;
 }
 
 export interface CappableQuest {
@@ -125,15 +132,20 @@ export interface CappableQuest {
   tier: QuestTier;
   importance: Importance;
   durationMin: number;
+  /** Planned workouts and auto-tracked quests are kept first. */
+  protected?: boolean;
 }
 
+/** Quests this short never make a day heavier — they are exempt from caps. */
+export const TRIVIAL_MINUTES = 5;
+
 /**
- * Keep the most important core quests; demote the rest to "important" so heavy days stay winnable.
- * Returns the ids that were demoted.
+ * Keep the most important quests of a tier; return the ids to demote so heavy days stay winnable.
+ * Trivial quests (≤ 5 min) are exempt: the cap is about effort, not about brushing your teeth.
  */
-export function selectDemotions(quests: CappableQuest[], cap: number): string[] {
-  const core = quests.filter((q) => q.tier === 'core');
-  if (core.length <= cap) return [];
-  const ranked = [...core].sort((a, b) => b.importance - a.importance || a.durationMin - b.durationMin);
+export function selectDemotions(quests: CappableQuest[], cap: number, tier: QuestTier = 'core'): string[] {
+  const list = quests.filter((q) => q.tier === tier && q.durationMin > TRIVIAL_MINUTES);
+  if (list.length <= cap) return [];
+  const ranked = [...list].sort((a, b) => Number(!!b.protected) - Number(!!a.protected) || b.importance - a.importance || a.durationMin - b.durationMin);
   return ranked.slice(cap).map((q) => q.id);
 }

@@ -74,6 +74,8 @@ export const METRIC_TYPES = [
   'distance',
   'activeCalories',
   'workoutMinutes',
+  /** Leisure screen time (games, short videos…) in minutes. */
+  'leisure',
 ] as const;
 export type MetricType = (typeof METRIC_TYPES)[number];
 export type MetricMap = Partial<Record<MetricType, number>>;

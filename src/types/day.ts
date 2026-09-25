@@ -74,9 +74,20 @@ export interface DayLog {
   closedAt?: Timestamp;
   penalties: PenaltyRecord[];
   worldIncome?: number;
+  /** 7-day success ratio captured at day start (null without history). */
+  consistency7d?: number | null;
+  /** HP gained from quests today (for the daily gain cap). */
+  hpFromQuests?: number;
+  /** Routine ids whose completion bonus was already granted today. */
+  routinesDone?: string[];
+  /** Smart rule ids already fired today. */
+  rulesFired?: string[];
   reviewed?: boolean;
   notes?: string;
 }
+
+/** Where a metric came from. Missing means manual entry; `health` is reserved for a future HealthKit bridge. */
+export type MetricSource = 'manual' | 'timer' | 'health' | 'import';
 
 export interface MetricEntry {
   id: ID;
@@ -85,6 +96,7 @@ export interface MetricEntry {
   value: number;
   ts: Timestamp;
   note?: string;
+  source?: MetricSource;
 }
 
 /** A per-day override of the weekly schedule. */

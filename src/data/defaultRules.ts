@@ -178,7 +178,8 @@ export const DEFAULT_RULES: GameRules = {
   generator: {
     sideQuestsByWorkload: { low: 4, medium: 2, high: 1 },
     maxDurationByWorkload: { low: 45, medium: 20, high: 10 },
-    maxCoreByWorkload: { low: 14, medium: 8, high: 5 },
+    maxCoreByWorkload: { low: 8, medium: 5, high: 4 },
+    maxImportantByWorkload: { low: 8, medium: 5, high: 3 },
     recencyDays: 3,
     challengeEnabled: true,
     hiddenEnabled: true,

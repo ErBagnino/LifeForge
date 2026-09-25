@@ -1,0 +1,26 @@
+/** Source artwork for all app icons (anvil + spark on an ember gradient). */
+export function iconSvg({ size = 512, rounded = true, scale = 1 } = {}) {
+  const r = rounded ? 112 : 0;
+  const t = (1 - scale) * 256;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="1" stop-color="#e8360f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.62" cy="0.3" r="0.5">
+      <stop offset="0" stop-color="#fff3b0" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#fff3b0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="${r}" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="${r}" fill="url(#glow)"/>
+  <g transform="translate(${t} ${t}) scale(${scale})">
+    <path d="M300 92 L316 146 L370 162 L316 178 L300 232 L284 178 L230 162 L284 146 Z" fill="#fff8d6"/>
+    <path d="M390 210 L398 232 L420 240 L398 248 L390 270 L382 248 L360 240 L382 232 Z" fill="#fff8d6" opacity="0.9"/>
+    <path d="M186 118 L191 134 L207 139 L191 144 L186 160 L181 144 L165 139 L181 134 Z" fill="#fff8d6" opacity="0.75"/>
+    <path d="M78 262 C120 262 150 256 170 252 L402 252 C412 252 420 260 420 270 L420 300 C420 310 412 316 402 318 C356 324 336 336 330 356 L338 384 L372 384 C381 384 388 391 388 400 L388 414 C388 423 381 430 372 430 L140 430 C131 430 124 423 124 414 L124 400 C124 391 131 384 140 384 L174 384 L182 356 C176 338 160 326 132 318 C104 310 86 292 78 262 Z" fill="#ffffff"/>
+    <rect x="170" y="252" width="232" height="14" rx="7" fill="#ffd9c7"/>
+  </g>
+</svg>`;
+}

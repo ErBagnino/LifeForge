@@ -75,6 +75,12 @@ export const SEED_ACTIVITIES: Activity[] = [
       'Daily check-in: no masturbation today. Check it off at night. A slip is data, not a verdict — log it honestly with Skip and start the next day clean.',
     stats: { discipline: 3, consistency: 1 }, energyCost: 0, tags: ['nofap', 'private'],
   }),
+  A('leisure_limit', 'Play time under budget', '🎮', 'mental_wellbeing', {
+    tier: 'core', recurrence: daily, difficulty: 3, durationMin: 1, metric: 'leisure', metricMode: 'atMost', unit: 'min', importance: 5,
+    description:
+      'Games, TikTok, reels, streaming for fun: stay within your daily budget (1h30 by default). Tap Start in the Play Time card when you begin and Stop when you are done. Video calls with your partner never count.',
+    stats: { discipline: 3 }, energyCost: 0, tags: ['leisure'],
+  }),
   A('cardio_session', 'Cardio program session', '🏃', 'cardio', {
     tier: 'important', recurrence: perWeek(3), difficulty: 3, durationMin: 30, timeOfDay: 'evening', preferredTime: '20:00',
     description: 'Session from your walk → run program. Tap to see today’s stage.', availableOn: 'any',
