@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb, metaRepository, playerRepository, questRepository, resetDbInstance, settingsRepository, suggestionRepository } from '@/repositories';
 import { ensureSeeded } from '../seedService';
 import { beginAdventure } from '../game/dayService';
@@ -6,7 +6,12 @@ import { clock } from '../clock';
 import { confirmWake, contextSnapshot, endWork, getDayContext, getOpenWork, learnedSchedule, recordOpen, resetLearnedSchedule, startDay, startWork, wakeNotYet, workHistory } from '../contextService';
 
 let n = 0;
-const setNow = (iso: string) => clock.setOffset(new Date(iso).getTime() - Date.now());
+// Only Date is faked (Dexie still needs real timers), so the clock can't drift between reads.
+const setNow = (iso: string) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(iso));
+  clock.setOffset(0);
+};
 async function fresh() {
   resetDbInstance(`lifeforge-context-${++n}`);
   setNow('2026-09-23T07:45:00'); // Wednesday
@@ -17,6 +22,9 @@ async function fresh() {
 
 describe('daily context service (IndexedDB)', () => {
   beforeEach(fresh);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('first open of the day is recorded once; the previous visit is remembered', async () => {
     await metaRepository.set('lastVisitDate', '2026-09-20');
