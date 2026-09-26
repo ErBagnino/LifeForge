@@ -48,7 +48,7 @@ export default function AvatarEditor() {
               setTab(t.value);
               setPreview({});
             }}
-            className={`h-10 rounded-xl text-[13px] font-semibold transition-colors ${tab === t.value ? 'bg-accent text-on-accent' : 'bg-surface-2 text-fg'}`}
+            className={`h-11 rounded-xl text-[13px] font-semibold transition-colors ${tab === t.value ? 'bg-accent text-on-accent' : 'bg-surface-2 text-fg'}`}
           >
             {t.label}
           </button>
