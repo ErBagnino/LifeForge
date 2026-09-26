@@ -169,3 +169,65 @@ export function ruleIntent(raw: string, today: ISODate): RuleIntent | undefined 
   }
   return undefined;
 }
+
+// ——— "Segna X completata" (handled on the device, no AI call) ———
+
+const SYNONYMS: Record<string, string[]> = {
+  acqua: ['drink water', 'water', 'hydrat', 'drink'],
+  bere: ['drink water', 'water', 'drink'],
+  palestra: ['workout', 'gym', 'upper', 'lower', 'train'],
+  allenamento: ['workout', 'train', 'upper', 'lower'],
+  passi: ['steps', 'walk'],
+  camminata: ['walk', 'steps'],
+  lettura: ['read'],
+  leggere: ['read'],
+  meditazione: ['meditat', 'mind'],
+  stretching: ['stretch', 'mobility'],
+  proteine: ['protein'],
+  letto: ['bed', 'make'],
+  cane: ['dog', 'walk'],
+  pulizie: ['clean', 'tidy'],
+  skincare: ['skin'],
+  denti: ['teeth', 'floss'],
+  doccia: ['shower'],
+  sonno: ['sleep', 'bed'],
+  nofap: ['nofap', 'porn', 'urge'],
+};
+
+const DONE_WORDS = /\b(segna|segnami|marca|metti|mark|complet\w*|ho fatto|ho finito|fatto|fatta|done|finished|check off|spunta)\b/;
+const STOP = new Set(['segna', 'segnami', 'marca', 'metti', 'mark', 'come', 'as', 'completata', 'completato', 'completa', 'complete', 'completed', 'ho', 'fatto', 'fatta', 'finito', 'done', 'finished', 'la', 'il', 'lo', 'le', 'i', 'gli', 'di', 'the', 'my', 'quest', 'task', 'oggi', 'today', 'check', 'off', 'spunta', 'e', 'and', 'a', 'ad']);
+
+/**
+ * "Segna acqua completata", "ho fatto la palestra", "mark reading done" → the single
+ * pending quest whose title matches. Ambiguous or no match → undefined (let the AI or
+ * the normal parser answer instead of guessing).
+ */
+export function completionIntent(raw: string, quests: { id: string; title: string }[]): RuleToolCall | undefined {
+  const t = normalize(raw);
+  if (!DONE_WORDS.test(t) || t.length > 80) return undefined;
+  const words = t
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP.has(w));
+  if (!words.length) return undefined;
+  const keys = [...new Set(words.flatMap((w) => [w, ...(SYNONYMS[w] ?? [])]))];
+  // Rank by match quality (phrase matches outweigh single words) and act only on a clear winner.
+  const ranked = quests
+    .map((q) => {
+      const title = normalize(q.title);
+      return { q, score: keys.filter((k) => title.includes(k)).reduce((sum, k) => sum + k.length, 0) };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score);
+  if (!ranked.length) return undefined;
+  if (ranked.length > 1 && ranked[0].score - ranked[1].score < 5) return undefined;
+  return { name: 'completeQuest', args: { questId: ranked[0].q.id } };
+}
+
+/** Commands the device can handle with certainty — no Gemini call needed even when it is connected. */
+export function isLocalCommand(raw: string, today: ISODate, quests: { id: string; title: string }[]): boolean {
+  if (completionIntent(raw, quests)) return true;
+  const r = ruleIntent(raw, today);
+  if (r?.kind === 'ask') return true;
+  return r?.kind === 'tools' && r.calls.every((c) => c.name === 'updateNutritionTargets' || c.name === 'updateWaterGoal' || c.name === 'createAchievement');
+}

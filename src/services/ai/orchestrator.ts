@@ -1,9 +1,12 @@
-import { settingsRepository } from '@/repositories';
+import { classifyCoachText } from '@/ai/shared/classify';
+import { isLocalCommand } from '@/domain/ruleIntents';
+import { questRepository, settingsRepository } from '@/repositories';
 import type { CoachPersonality } from '@/types';
 import { geminiReady, useAi } from '@/store/aiStore';
 import { uid } from '@/utils/id';
 import { type ActionCard, type AwaitingTurn, type ChatMessage, type ChatState, save, sendMessage as basicCoach } from '../coachService';
 import type { GameEvent, ServiceResult } from '../events';
+import { clock } from '../clock';
 import { undoChange } from './changeLog';
 import { buildContext } from './context';
 import { AiClientError, CLIENT_ERROR_MESSAGES, type ChatResponse, type GeminiContent, geminiProvider } from './gemini';
@@ -93,7 +96,20 @@ export async function sendMessage(state: ChatState, input: TurnInput, opts: { fo
     }
     return basicCoach(state, input);
   }
+  // Commands the device handles with certainty never spend a Gemini request.
+  if (!input.image && (await localCommand(input.text))) {
+    const r = await basicCoach(state, input);
+    const msgs = r.state.messages;
+    const last = msgs[msgs.length - 1];
+    return { ...r, state: await save({ ...r.state, messages: [...msgs.slice(0, -1), { ...last, local: true }] }) };
+  }
   return geminiTurn(state, input, settings.coach.personality);
+}
+
+async function localCommand(text: string): Promise<boolean> {
+  const today = clock.today();
+  const pending = (await questRepository.byDate(today)).filter((q) => q.status === 'pending').map((q) => ({ id: q.id, title: q.title }));
+  return isLocalCommand(text, today, pending);
 }
 
 async function geminiTurn(state: ChatState, input: TurnInput, personality: CoachPersonality): Promise<TurnResult> {
@@ -113,6 +129,10 @@ function cancelPending(messages: ChatMessage[]): ChatMessage[] {
 
 interface LoopCtx {
   userText: string;
+  /** Model that answered the previous step (kept by the router when healthy). */
+  model?: string;
+  /** A fallback model answered at some point in this turn. */
+  switched?: boolean;
   personality: CoachPersonality;
   step: number;
   /** Cards already shown in this turn (for the local summary). */
@@ -125,13 +145,20 @@ async function loop(state: ChatState, contents: GeminiContent[], ctx: LoopCtx): 
   controller = new AbortController();
   const signal = controller.signal;
   let res: ChatResponse;
+  let stepId: string;
   for (;;) {
+    stepId = uid('r_');
     try {
-      res = await geminiProvider.chat({ contents, context: await buildContext(), personality: ctx.personality }, signal);
+      res = await geminiProvider.chat(
+        { contents, context: await buildContext(), personality: ctx.personality },
+        { signal, requestId: stepId, lastModel: ctx.model, intent: ctx.step === 0 && ctx.userText ? classifyCoachText(ctx.userText) : undefined },
+      );
     } catch (e) {
       return failTurn(state, ctx, e);
     }
     contents.push(res.content);
+    ctx.model = res.model;
+    if (res.routing?.fallback) ctx.switched = true;
     if (!res.calls.length) break;
     if (ctx.step >= MAX_STEPS) {
       res = { ...res, text: res.text || localSummary(ctx.cards) };
@@ -157,7 +184,7 @@ async function loop(state: ChatState, contents: GeminiContent[], ctx: LoopCtx): 
       const card: ActionCard = { id: uid('a_'), callIndex: i, name: a.call.name, args: a.call.args, permission: a.permission, title: a.title, lines: a.lines, warnings: a.warnings, confirmPhrase: a.confirmPhrase, undoable: a.undoable, status: 'pending' };
       if (a.permission === 'low') {
         // Low-risk (complete/skip): applied right away, with an Undo button.
-        const { result, events } = await execute(a, { source: 'gemini' });
+        const { result, events } = await execute(a, { source: 'gemini', idempotencyKey: `${stepId}:${i}:${call.id ?? call.name}` });
         ctx.events.push(...events);
         call.result = toResponse(result);
         Object.assign(card, { status: result.success ? 'applied' : 'failed', result: result.message, changeId: result.changeId });
@@ -169,7 +196,7 @@ async function loop(state: ChatState, contents: GeminiContent[], ctx: LoopCtx): 
     if (cards.some((c) => c.status === 'pending')) {
       // Pause: show the preview cards and wait for the user.
       const msg = coachMsg(res.text || (cards.length > 1 ? 'Here’s what I’d change. Check it and apply:' : 'Here’s the change. Check it and apply:'), { ai: true, actions: cards });
-      const awaiting: AwaitingTurn = { messageId: msg.id, contents: stripImages(contents), calls, step: ctx.step };
+      const awaiting: AwaitingTurn = { messageId: msg.id, contents: stripImages(contents), calls, step: ctx.step, stepId, model: ctx.model };
       const next = await save({ ...state, messages: [...state.messages, msg], awaiting, transcript: remember(state, ctx.userText, `${msg.text} [proposed: ${cards.map((c) => c.title).join('; ')}]`) });
       return { state: next, result: { events: ctx.events } };
     }
@@ -177,7 +204,7 @@ async function loop(state: ChatState, contents: GeminiContent[], ctx: LoopCtx): 
     contents.push({ role: 'user', parts: responseParts(calls) });
   }
   const text = res.text.trim() || localSummary(ctx.cards);
-  const msg = coachMsg(text, { ai: true });
+  const msg = coachMsg(text, { ai: true, ...(ctx.switched ? { notice: { kind: 'switched', text: 'AI model switched automatically.' } } : {}) });
   const next = await save({ ...state, messages: [...state.messages, msg], awaiting: undefined, transcript: remember(state, ctx.userText, text) });
   return { state: next, result: { events: ctx.events } };
 }
@@ -189,6 +216,11 @@ async function failTurn(state: ChatState, ctx: LoopCtx, e: unknown): Promise<Tur
   }
   useAi.getState().noteError(err.kind);
   const done = ctx.cards.some((c) => c.status === 'applied') ? ` ${localSummary(ctx.cards)}` : '';
+  if (err.kind === 'no_model' || err.kind === 'cost_blocked') {
+    const when = err.retryAt && err.retryAt > Date.now() ? ` A model should be available again in about ${Math.max(1, Math.ceil((err.retryAt - Date.now()) / 60_000))} min.` : '';
+    const msg = coachMsg(`${err.message}${when}${done}`, { notice: { kind: 'no_model', text: err.kind === 'cost_blocked' ? 'NO VERIFIED FREE TIER MODEL' : 'GEMINI UNAVAILABLE' } });
+    return { state: await save({ ...state, awaiting: undefined, messages: [...state.messages, msg] }), result: { events: ctx.events } };
+  }
   if (err.kind === 'quota') {
     const retry = err.quota?.retryAfterSec ? ` Google says you can retry in about ${Math.ceil(err.quota.retryAfterSec / 60)} min.` : '';
     const msg = coachMsg(`${CLIENT_ERROR_MESSAGES.quota}${retry}${done}`, { notice: { kind: 'quota', text: 'GEMINI LIMIT REACHED' } });
@@ -233,7 +265,8 @@ export async function resolveAction(state: ChatState, messageId: string, cardId:
     if (!p.ok || p.kind !== 'action') {
       result = p.ok ? { success: false, message: 'Not an action.' } : p.result;
     } else {
-      const r = await execute(p.action, { source: state.awaiting?.messageId === messageId ? 'gemini' : 'rules', typedPhrase });
+      const aw0 = state.awaiting?.messageId === messageId ? state.awaiting : undefined;
+      const r = await execute(p.action, { source: aw0 ? 'gemini' : 'rules', typedPhrase, idempotencyKey: aw0 ? `${aw0.stepId ?? messageId}:${found.card.callIndex}:${found.card.name}` : `card:${found.card.id}` });
       events.push(...r.events);
       result = r.result;
       if (!result.success && result.error === 'confirmation_required') return { state: await save(patchCard(state, messageId, cardId, { result: result.message })) };
@@ -258,7 +291,7 @@ export async function resolveAction(state: ChatState, messageId: string, cardId:
         const next = await save({ ...base, messages: [...base.messages, coachMsg(localSummary(msg.actions ?? []))] });
         return { state: next, result: { events } };
       }
-      const r = await loop(base, contents, { userText: '', personality: settings.coach.personality, step: aw.step, cards: msg.actions ?? [], events });
+      const r = await loop(base, contents, { userText: '', personality: settings.coach.personality, step: aw.step, cards: msg.actions ?? [], events, model: aw.model });
       return r;
     }
   }
@@ -292,6 +325,14 @@ export async function answerWithBasicCoach(state: ChatState): Promise<TurnResult
   if (!lastUser) return { state };
   const idx = state.messages.lastIndexOf(lastUser);
   return basicCoach({ ...state, messages: state.messages.slice(0, idx) }, { text: lastUser.text });
+}
+
+/** [TRY AGAIN] after "Gemini is temporarily unavailable": resend the last user message. */
+export async function retryLast(state: ChatState): Promise<TurnResult> {
+  const lastUser = [...state.messages].reverse().find((m) => m.role === 'user');
+  if (!lastUser) return { state };
+  const idx = state.messages.lastIndexOf(lastUser);
+  return sendMessage({ ...state, messages: state.messages.slice(0, idx) }, { text: lastUser.text });
 }
 
 /** Settings → AI → Clear AI history: forget the Gemini transcript (chat bubbles stay). */

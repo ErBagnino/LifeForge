@@ -1,4 +1,5 @@
 import { ROUTES, type HealthStatus, type LimitValue, type ModelHint, type ModelLimits, type RequestType, type RoutingAttempt } from '../../src/ai/shared/models.js';
+import { nextPacificMidnight } from '../../src/ai/shared/time.js';
 import type { RegistryModel } from './registry.js';
 
 /**
@@ -41,17 +42,7 @@ export function resetHealth(): void {
   health.clear();
 }
 
-/** Milliseconds until the next midnight in Pacific Time (when Google resets daily quotas). */
-export function nextPacificMidnight(now: number): number {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(now));
-    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
-    const elapsed = (get('hour') * 3600 + get('minute') * 60 + get('second')) * 1000;
-    return now + (86_400_000 - elapsed);
-  } catch {
-    return now + 24 * 3_600_000;
-  }
-}
+export { nextPacificMidnight };
 
 /** Update a model's health after an attempt; returns the cooldown applied (if any). */
 export function recordOutcome(id: string, a: RoutingAttempt, now: number): number | undefined {

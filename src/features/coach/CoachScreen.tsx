@@ -7,8 +7,8 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { Proposal } from '@/domain/coachAssistant';
 import { WEEK_ORDER, WEEKDAY_SHORT } from '@/domain/schedule';
 import { useSpeech } from '@/hooks';
-import { usageBadge } from '@/domain/aiUsage';
-import { applyAll, answerWithBasicCoach, cancelTurn, resolveAction, sendMessage, undoAction } from '@/services/ai/orchestrator';
+import { routerBadge } from '@/domain/aiRouter';
+import { applyAll, answerWithBasicCoach, cancelTurn, resolveAction, retryLast, sendMessage, undoAction } from '@/services/ai/orchestrator';
 import { type ActionCard, applyProposal, type ChatMessage, type ChatState, clearChat, dismissProposal, editProposalDays, loadChat, welcomeMessage } from '@/services/coachService';
 import { compressImage } from '@/services/foodService';
 import { geminiReady, useAi } from '@/store/aiStore';
@@ -106,7 +106,7 @@ function ActionCardView({ a, busy, onApply, onCancel, onUndo }: { a: ActionCard;
           </ul>
         )}
         {a.warnings.map((w) => (
-          <p key={w} className="mt-2 rounded-2xl bg-warning/10 px-3 py-1.5 text-[13px] text-fg">
+          <p key={w} className="mt-2 rounded-2xl bg-warn/10 px-3 py-1.5 text-[13px] text-fg">
             ⚠️ {w}
           </p>
         ))}
@@ -146,6 +146,20 @@ function ActionCardView({ a, busy, onApply, onCancel, onUndo }: { a: ActionCard;
   );
 }
 
+function UnavailableCard({ title, onRetry, onBasic }: { title: string; onRetry: () => void; onBasic: () => void }) {
+  return (
+    <div className="mt-2 rounded-3xl border border-warn/40 bg-surface p-3 shadow-card">
+      <div className="text-[11px] font-extrabold tracking-[0.16em] text-warn">{title}</div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button variant="secondary" icon="refresh" onClick={onRetry}>
+          TRY AGAIN
+        </Button>
+        <Button onClick={onBasic}>USE BASIC COACH</Button>
+      </div>
+    </div>
+  );
+}
+
 function QuotaCard({ onBasic, onUsage }: { onBasic: () => void; onUsage: () => void }) {
   return (
     <div className="mt-2 rounded-3xl border border-danger/40 bg-surface p-3 shadow-card">
@@ -170,6 +184,7 @@ interface BubbleHandlers {
   onUndo: (messageId: string, cardId: string) => void;
   onBasic: () => void;
   onUsage: () => void;
+  onRetry: () => void;
 }
 
 function Bubble({ m, last, busy, h }: { m: ChatMessage; last: boolean; busy: boolean; h: BubbleHandlers }) {
@@ -184,8 +199,11 @@ function Bubble({ m, last, busy, h }: { m: ChatMessage; last: boolean; busy: boo
           {m.text}
           {m.ai && <span className="ml-1.5 align-middle text-[10px] font-bold tracking-wider text-muted">GEMINI</span>}
         </div>
-        {m.notice && m.notice.kind !== 'quota' && <div className="mt-1 px-2 text-[11px] text-muted">⚠️ {m.notice.text} — basic coach answered.</div>}
+        {m.local && <div className="mt-1 px-2 text-[11px] text-muted">⚡ Handled on-device — no AI request used</div>}
+        {m.notice?.kind === 'switched' && <div className="mt-1 px-2 text-[11px] text-muted">↻ {m.notice.text}</div>}
+        {m.notice && !['quota', 'switched', 'no_model'].includes(m.notice.kind) && <div className="mt-1 px-2 text-[11px] text-muted">⚠️ {m.notice.text} — basic coach answered.</div>}
         {m.notice?.kind === 'quota' && last && <QuotaCard onBasic={h.onBasic} onUsage={h.onUsage} />}
+        {m.notice?.kind === 'no_model' && last && <UnavailableCard title={m.notice.text} onRetry={h.onRetry} onBasic={h.onBasic} />}
         {!!m.actions?.length && (
           <div className="mt-2 space-y-2">
             {m.actions.map((a) => (
@@ -240,6 +258,10 @@ export default function CoachScreen() {
   const refresh = useGame((s) => s.refresh);
   const ui = useAi((s) => s.ui);
   const usage = useAi((s) => s.usage);
+  const aiModels = useAi((s) => s.models);
+  const routerStats = useAi((s) => s.router);
+  const perModel = useAi((s) => s.perModel);
+  const refreshModels = useAi((s) => s.refreshModels);
   const checkAi = useAi((s) => s.check);
   const [chat, setChat] = useState<ChatState | null>(null);
   const [text, setText] = useState(() => {
@@ -257,8 +279,9 @@ export default function CoachScreen() {
   useEffect(() => {
     void loadChat().then(setChat);
     void checkAi();
+    void refreshModels();
     return () => cancelTurn();
-  }, [checkAi]);
+  }, [checkAi, refreshModels]);
   const autoSent = useRef(false);
   useEffect(() => {
     const st = location.state as { draft?: string; send?: boolean } | null;
@@ -330,9 +353,10 @@ export default function CoachScreen() {
     onUndo: (mid, cid) => void run(() => undoAction(chat, mid, cid)),
     onBasic: () => void run(() => answerWithBasicCoach(chat)),
     onUsage: () => navigate('/settings/ai#usage'),
+    onRetry: () => void run(() => retryLast(chat)),
   };
   const connected = geminiReady(settings.coach.ai.enabled);
-  const badge = usageBadge({ level: usage?.level ?? 'unknown', limitReached: usage?.limitReached ?? ui === 'quota' }, connected);
+  const badge = routerBadge({ connected, quota: ui === 'quota' || !!usage?.limitReached, models: aiModels?.models, stats: routerStats, perModel, usage: settings.coach.ai.usage });
 
   const mic = () => {
     if (!speech.supported) {
@@ -358,7 +382,7 @@ export default function CoachScreen() {
             <div className="truncate text-[14px] font-black tracking-[0.14em]">LIFEFORGE COACH</div>
             <button type="button" onClick={() => navigate('/settings/ai#usage')} className="hit-44 flex max-w-full items-center gap-1 truncate text-[11px] text-muted" aria-label={`AI status: ${badge.label}. Open Gemini usage`}>
               <span aria-hidden>{badge.icon}</span>
-              <span className="truncate">{connected || badge.tone === 'bad' ? badge.label : ui === 'connecting' ? 'Connecting…' : 'Basic coach · preview first'}</span>
+              <span className="truncate">{connected ? `${badge.label} · Gemini • Auto` : badge.tone === 'bad' ? badge.label : ui === 'connecting' ? 'Connecting…' : 'Basic coach · preview first'}</span>
             </button>
           </div>
           <button type="button" onClick={() => void run(() => clearChat())} className="flex h-11 w-11 items-center justify-center rounded-full text-muted" aria-label="Clear chat">
@@ -444,7 +468,7 @@ export default function CoachScreen() {
                 send(text);
               }
             }}
-            placeholder={speech.listening ? 'Listening…' : 'Tell me what changed…'}
+            placeholder={speech.listening ? 'Listening…' : 'Ask or tell me…'}
             aria-label="Message the Coach"
             className="min-h-11 min-w-0 flex-1 resize-none rounded-3xl border border-line bg-surface px-4 py-[10px] text-[16px] leading-snug outline-none focus:border-accent"
           />

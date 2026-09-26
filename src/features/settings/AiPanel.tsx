@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { Field, List, NumberInput, Row, Segmented, Select, Toggle } from '@/components/ui/forms';
-import { ProgressBar } from '@/components/ui/progress';
 import { Button, Card, cx } from '@/components/ui/primitives';
-import { LIMIT_LABEL, type LimitStatus, type PeriodUsage, type UsageLevel } from '@/domain/aiUsage';
+import { LIMIT_LABEL, type PeriodUsage } from '@/domain/aiUsage';
 import { saveSettings } from '@/services/adminService';
 import { clearChangeLog } from '@/services/ai/changeLog';
 import { clearAiHistory } from '@/services/ai/orchestrator';
 import { clearUsage, OFFICIAL_USAGE_URL } from '@/services/ai/usageService';
+import { effectiveLimits, modelPressure } from '@/domain/aiRouter';
+import { AdvancedRouter, AiSystemCard, CostControl, ModelUsageSection } from './ModelRouterPanel';
 import { loadChat } from '@/services/coachService';
 import { type AiUiState, useAi } from '@/store/aiStore';
 import { useGame } from '@/store/gameStore';
@@ -32,14 +33,6 @@ const STATE_VIEW: Record<AiUiState, { label: string; tone: string; dot: string }
   offline: { label: 'OFFLINE', tone: 'text-muted', dot: '⚪' },
 };
 
-const LEVEL_VIEW: Record<UsageLevel, { icon: string; label: string; color: string }> = {
-  unknown: { icon: '', label: 'Unknown', color: 'var(--lf-faint)' },
-  low: { icon: '🟢', label: 'Low usage', color: 'var(--lf-success)' },
-  moderate: { icon: '🟡', label: 'Moderate usage', color: '#e0b000' },
-  high: { icon: '🟠', label: 'High usage', color: '#f07c00' },
-  near: { icon: '🔴', label: 'Near limit', color: 'var(--lf-danger)' },
-  reached: { icon: '⚠️', label: 'Limit reached', color: 'var(--lf-danger)' },
-};
 
 const STEPS = [
   'Open Google AI Studio (aistudio.google.com) and sign in with your Google account.',
@@ -93,23 +86,6 @@ function PeriodTable({ rows }: { rows: [string, PeriodUsage][] }) {
   );
 }
 
-function LimitBar({ l }: { l: LimitStatus }) {
-  const v = LEVEL_VIEW[l.level];
-  return (
-    <div>
-      <div className="flex justify-between gap-2 text-[13px]">
-        <span className="font-semibold">{LIMIT_LABEL[l.key]}</span>
-        <span className="num shrink-0 text-muted">
-          {formatInt(l.used)} / {formatInt(l.limit)} · {v.icon} {v.label}
-        </span>
-      </div>
-      <ProgressBar value={l.used / l.limit} color={v.color} height={8} className="mt-1" label={LIMIT_LABEL[l.key]} />
-      <div className="num mt-0.5 text-[11px] text-muted">
-        ~{formatInt(l.remaining)} left of the limit you entered ({l.pct}%) · {l.key === 'rpd' ? 'today, from this device' : 'last 60 s, from this device'}
-      </div>
-    </div>
-  );
-}
 
 function resetInfo(key: string): string {
   if (key === 'rpm' || key === 'tpm') return 'Per-minute limits free up within about a minute.';
@@ -121,7 +97,12 @@ function resetInfo(key: string): string {
 export function AiPanel() {
   const { settings, save } = useCoachSettings();
   const ai = settings.coach.ai;
-  const { ui, status, usage, check, refreshUsage } = useAi();
+  const { ui, status, usage, check, refreshUsage, refreshModels, models, perModel, router } = useAi();
+  const pressure = (models?.models ?? [])
+    .filter((m) => m.usable)
+    .map((m) => modelPressure(m.id, perModel[m.id], effectiveLimits(m.id, settings.coach.ai.usage, router)))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .sort((a, b) => b.pct - a.pct)[0];
   const location = useLocation();
   const [testing, setTesting] = useState(false);
   const [tested, setTested] = useState<string | null>(null);
@@ -130,7 +111,8 @@ export function AiPanel() {
   useEffect(() => {
     void check();
     void refreshUsage();
-  }, [check, refreshUsage]);
+    void refreshModels();
+  }, [check, refreshUsage, refreshModels]);
   useEffect(() => {
     if (location.hash === '#usage') setTimeout(() => document.getElementById('usage')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
   }, [location.hash]);
@@ -148,8 +130,6 @@ export function AiPanel() {
   };
 
   const u = usage;
-  const worst = u?.worst;
-  const warn = u && (u.limitReached || (worst && (worst.level === 'moderate' || worst.level === 'high' || worst.level === 'near' || worst.level === 'reached')));
 
   return (
     <div className="mt-3">
@@ -175,12 +155,15 @@ export function AiPanel() {
         <p className="mt-2 text-[12px] text-muted">The test sends one tiny request to Gemini (it counts toward your usage).</p>
       </Card>
 
+      <AiSystemCard />
+
       {/* ——— Preferences ——— */}
       <List title="AI features">
         <Row title="Use Gemini" subtitle="Off = basic coach only, nothing sent" right={<Toggle checked={ai.enabled} onChange={(v) => void saveAi({ enabled: v })} label="Use Gemini" />} />
         <Row title="Food Vision" subtitle="Estimate meals from photos" right={<Toggle checked={ai.foodVision} onChange={(v) => void saveAi({ foodVision: v })} label="Food Vision" />} />
         <Row title="Save Food Photos" subtitle="Small thumbnail on this device only" right={<Toggle checked={ai.savePhotos} onChange={(v) => void saveAi({ savePhotos: v })} label="Save Food Photos" />} />
       </List>
+      <CostControl />
       <div className="mt-4 px-1">
         <div className="mb-1.5 px-3 text-[13px] font-semibold text-muted">Coach personality</div>
         <Segmented<CoachPersonality>
@@ -254,49 +237,27 @@ export function AiPanel() {
         </Card>
       )}
 
-      {warn && worst && !u?.limitReached && (
+      {pressure && pressure.pct >= ai.usage.thresholds.notice && !u?.limitReached && (
         <Card className="mt-3">
           <div className="text-[14px] font-bold">You're approaching your estimated Gemini usage limit.</div>
           <p className="mt-1 text-[13px] text-muted">
-            {LIMIT_LABEL[worst.key]} is at {worst.pct}% of the limit you entered (~{formatInt(worst.remaining)} left). {resetInfo(worst.key)}
+            {pressure.model}: {LIMIT_LABEL[pressure.key]} at {pressure.pct}% of the known limit (~{formatInt(pressure.remaining)} left, app estimate). {resetInfo(pressure.key)} The router moves to another compatible Free Tier model when one is near its limit.
           </p>
         </Card>
       )}
 
-      <Card className="mt-3">
-        <div className="text-[14px] font-bold">Limits</div>
-        <p className="mt-1 text-[13px] text-muted">
-          The Gemini API doesn’t tell apps their remaining quota, and limits differ per model and project. <b>Exact quota available in Google AI Studio.</b> To see progress bars here, copy your limits from AI Studio (Dashboard → Usage / Rate limits) — they’re compared with this device’s requests only.
-        </p>
-        {u && u.limits.length > 0 ? (
-          <div className="mt-3 space-y-3">
-            {u.limits.map((l) => (
-              <LimitBar key={l.key} l={l} />
-            ))}
-            <p className="text-[11px] text-muted">🟢 Low · 🟡 Moderate (≥{ai.usage.thresholds.notice}%) · 🟠 High (≥{ai.usage.thresholds.warning}%) · 🔴 Near limit (≥{ai.usage.thresholds.critical}%) · ⚠️ Limit reached</p>
-          </div>
-        ) : (
-          <p className="mt-2 text-[12px] text-muted">No limits entered: the app shows counts only, never a percentage.</p>
-        )}
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {(['rpm', 'tpm', 'rpd'] as const).map((k) => (
-            <Field key={k} label={k.toUpperCase()}>
-              <NumberInput value={ai.usage.limits[k] ?? 0} min={0} onChange={(v) => void saveUsage({ limits: { ...ai.usage.limits, [k]: v > 0 ? v : undefined } })} aria-label={LIMIT_LABEL[k]} />
+      <ModelUsageSection />
+      <details className="mt-2 rounded-2xl bg-surface px-4 py-1 shadow-card">
+        <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold">Warning thresholds</summary>
+        <div className="grid grid-cols-3 gap-2 pb-3">
+          {(['notice', 'warning', 'critical'] as const).map((k) => (
+            <Field key={k} label={`${k[0].toUpperCase()}${k.slice(1)} %`}>
+              <NumberInput value={ai.usage.thresholds[k]} min={1} max={100} onChange={(v) => void saveUsage({ thresholds: { ...ai.usage.thresholds, [k]: Math.min(100, Math.max(1, v)) } })} aria-label={`${k} threshold`} />
             </Field>
           ))}
         </div>
-        <p className="mt-1 text-[11px] text-muted">RPM = requests per minute · TPM = tokens per minute · RPD = requests per day. 0 = not set.</p>
-        <details className="mt-2">
-          <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold">Warning thresholds</summary>
-          <div className="grid grid-cols-3 gap-2">
-            {(['notice', 'warning', 'critical'] as const).map((k) => (
-              <Field key={k} label={`${k[0].toUpperCase()}${k.slice(1)} %`}>
-                <NumberInput value={ai.usage.thresholds[k]} min={1} max={100} onChange={(v) => void saveUsage({ thresholds: { ...ai.usage.thresholds, [k]: Math.min(100, Math.max(1, v)) } })} aria-label={`${k} threshold`} />
-              </Field>
-            ))}
-          </div>
-        </details>
-      </Card>
+        <p className="pb-3 text-[11px] text-muted">🟢 Healthy · 🟡 High usage (≥{ai.usage.thresholds.notice}%) · 🟠 Near limit (≥{ai.usage.thresholds.critical}%) · 🔴 Rate limited · ⚫ Unavailable — percentages only against limits Google reported or you entered.</p>
+      </details>
 
       <List title="Usage settings" footer="Food Vision requests can use more resources than short text requests. Long conversations and large context also use more tokens. LifeForge keeps prompts short, sends a compact context, caches repeated food requests and computes numbers locally to save quota.">
         <Row title="Enable usage tracking" subtitle="Timestamps, model, tokens, status — no message content" right={<Toggle checked={ai.usage.tracking} onChange={(v) => void saveUsage({ tracking: v })} label="Enable usage tracking" />} />
@@ -309,6 +270,8 @@ export function AiPanel() {
           }}
         />
       </List>
+
+      <AdvancedRouter />
 
       {/* ——— Privacy ——— */}
       <Card className="mt-6">

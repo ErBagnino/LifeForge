@@ -1,4 +1,5 @@
 import { TOOL_BY_NAME, TOOL_DEFS, type Permission } from '@/ai/shared/tools';
+import { metaRepository } from '@/repositories';
 import type { GameEvent } from '../../events';
 import { logChange, recordChanges } from '../changeLog';
 import { READ_TOOLS, readContext, ToolError } from './readTools';
@@ -24,6 +25,8 @@ export interface ToolResult {
   undoable?: boolean;
   cancelled?: boolean;
   error?: string;
+  /** Already executed earlier with the same idempotency key: nothing ran again. */
+  duplicate?: boolean;
 }
 
 export interface PreparedAction {
@@ -99,10 +102,37 @@ export async function runRead(call: ToolCall): Promise<ToolResult> {
  * Execute a prepared action (after the user confirmed it). Every tracked record it
  * touches is snapshotted so the change can be undone from the chat.
  */
-export async function execute(action: PreparedAction, opts: { source: 'gemini' | 'rules' | 'user'; typedPhrase?: string }): Promise<{ result: ToolResult; events: GameEvent[] }> {
+export async function execute(action: PreparedAction, opts: { source: 'gemini' | 'rules' | 'user'; typedPhrase?: string; idempotencyKey?: string }): Promise<{ result: ToolResult; events: GameEvent[] }> {
   if (action.confirmPhrase && opts.typedPhrase?.trim() !== action.confirmPhrase) {
     return { result: { success: false, message: `Not applied: type "${action.confirmPhrase}" exactly to confirm.`, error: 'confirmation_required' }, events: [] };
   }
+  // Idempotency: the same tool call (request id + call index) never runs twice,
+  // e.g. after a retry, a double tap or a resumed turn.
+  if (opts.idempotencyKey) {
+    const previous = (await loadRuns())[opts.idempotencyKey];
+    if (previous) return { result: { ...previous.result, duplicate: true }, events: [] };
+  }
+  const out = await executeOnce(action, opts);
+  if (opts.idempotencyKey && out.result.success) await saveRun(opts.idempotencyKey, out.result);
+  return out;
+}
+
+const RUNS_KEY = 'aiToolRuns';
+type Runs = Record<string, { ts: number; result: ToolResult }>;
+
+async function loadRuns(): Promise<Runs> {
+  return (await metaRepository.get<Runs>(RUNS_KEY).catch(() => undefined)) ?? {};
+}
+
+async function saveRun(key: string, result: ToolResult): Promise<void> {
+  const now = Date.now();
+  const runs = Object.entries(await loadRuns())
+    .filter(([, v]) => now - v.ts < 24 * 3_600_000)
+    .slice(-199);
+  await metaRepository.set(RUNS_KEY, Object.fromEntries([...runs, [key, { ts: now, result }]])).catch(() => undefined);
+}
+
+async function executeOnce(action: PreparedAction, opts: { source: 'gemini' | 'rules' | 'user' }): Promise<{ result: ToolResult; events: GameEvent[] }> {
   try {
     const { value, entries } = await recordChanges(() => action.plan.apply());
     let changeId: string | undefined;

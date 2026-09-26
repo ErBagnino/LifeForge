@@ -143,7 +143,10 @@ Environment Variables in production).
 | Variable | Where it's used | Purpose |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | **Server only** (`api/*`) | Gemini API key for the AI Coach and food photos. Never exposed to the browser. |
-| `GEMINI_MODEL` | Server only | Optional model override. Default `gemini-flash-latest` (Google's alias for the current Flash model: multimodal, Free Tier). |
+| `GEMINI_MODEL` | Server only | Optional preferred first model for the router (used only if it is verified Free Tier while FREE TIER ONLY is on). Fallback when model discovery fails: `gemini-flash-latest`. |
+| `GEMINI_FREE_MODELS` | Server only | Comma-separated models **you verified** as Free Tier in AI Studio (for models the app doesn't know yet). |
+| `GEMINI_PAID_MODELS` | Server only | Comma-separated models to treat as paid (never used in FREE TIER ONLY mode). |
+| `GEMINI_ALLOW_PAID` | Server only | Leave unset for €0. Paid/unverified models run only if this is `true` **and** FREE TIER ONLY is off in the app. |
 | `VITE_PUSH_PUBLIC_KEY` | Client (build time) | VAPID public key (URL-safe base64). |
 | `VITE_PUSH_ENDPOINT` | Client (build time) | Base URL of your push backend (see below). |
 
@@ -177,6 +180,52 @@ model and **can change at any time**; Google AI Studio shows the current ones. F
 Google to improve its products — see Google's terms. When a limit is hit, the app shows *"Gemini is temporarily
 unavailable because a usage limit has been reached."* with **USE BASIC COACH** / **VIEW USAGE**; nothing breaks
 and nothing is lost.
+
+### Model router (multiple Free Tier models, automatic fallback)
+
+LifeForge doesn't depend on a single model. On the server (`server/ai/router.ts`), every request goes
+through a **Model Router**:
+
+```
+request → classify (TEXT_CHAT, PLANNING, DATA_ANALYSIS, TOOL_EXECUTION, IMAGE_ANALYSIS, FOOD_IMAGE, FOOD_REVISE, …)
+        → capability filter (tools, images, JSON output… — fallbacks never drop a required capability)
+        → Cost Guard (FREE TIER ONLY: verified Free Tier models only)
+        → availability (cooldowns, daily limit reached, near RPM/TPM/RPD)
+        → score (route preference, newer/stable versions, load, recent errors) → ordered chain
+        → call → 429? cooldown + next model · 5xx? retry ×2 with backoff, then next model
+```
+
+- **Discovery:** the models your key can use are listed from the Gemini API (`models.list`, cached 10 min;
+  Settings → AI → *Refresh models*). Deprecated or removed models drop out automatically, and a 404 marks a
+  model unavailable.
+- **Capabilities** come from the model family (Flash-Lite / Flash / Pro / Gemma / Live…). A new model with an
+  unfamiliar name gets *unknown* capabilities and is not used until the app knows it. Image-generation, TTS and
+  embedding models are never used for Food Vision or chat; Live/audio models only for realtime voice.
+- **Routes:** quick questions prefer a fast Flash-Lite model, planning/analysis a more capable one (Pro only if it
+  is verified Free Tier), Food Vision a model with image input + structured output. Not round robin: a healthy
+  model keeps answering until a limit, an error or a better fit says otherwise; within one conversation turn the
+  same model is kept (switching strips model-specific thought signatures).
+- **Zero billing:** FREE TIER ONLY is on by default (Settings → AI → Cost Control). Only documented Free Tier models
+  (2.5 Flash, 2.5 Flash-Lite, the Flash `-latest` aliases, 3 Flash preview, 3.1 Flash-Lite preview, Gemma) or models
+  in `GEMINI_FREE_MODELS` pass the Cost Guard, which re-checks before every call. If Google answers a 429 with a quota
+  of 0, the model is marked not available on your project. If nothing verified fits a request:
+  *"This model cannot be verified as Free Tier."* The strongest protection is still a project without billing.
+- **Limits** are never hard-coded (they differ per model and change over time). The router uses limits Google reports
+  in 429 details, and limits you copy from AI Studio per model (a number, `unlimited`, or Unknown — Unknown is never
+  treated as Unlimited, and unlimited RPM still respects TPM/RPD). RPD cooldowns last until midnight Pacific time.
+- **Idempotency:** generation retries are side-effect free (tools run in the app afterwards). Every tool call carries
+  an idempotency key (request id + call index), and repeated request ids are answered from a short server cache, so a
+  retry never creates a second quest.
+- **No call when not needed:** commands the device can handle with certainty ("segna acqua completata", "porta le
+  calorie a 1900", the reset clarification) never reach Gemini.
+- **UI:** the Coach shows *🟢 AI Ready · Gemini • Auto*, a discreet *"AI model switched automatically."* after a
+  fallback, and *"Gemini is temporarily unavailable for this type of request."* with TRY AGAIN / USE BASIC COACH when no
+  compatible model is available. Settings → AI shows AI SYSTEM counts, per-model **MODEL USAGE** (🟢 Healthy · 🟡 High
+  usage · 🟠 Near limit · 🔴 Rate limited · ⚫ Unavailable, cooldowns, requests, RPM/TPM/RPD) and **Advanced** (current and
+  last model, selection reason, fallback count, rate limits, availability per request type, last errors).
+- **Serverless note:** Vercel instances don't share memory, so the app sends a compact summary of each model's health
+  with every request. These hints can only make the router avoid a model, never enable an unverified one.
+- **Logs** (server): model, request type, status, latency, attempts and error category only — no content, photos or key.
 
 ### Usage monitor
 

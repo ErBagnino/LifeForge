@@ -175,6 +175,15 @@ services/ai/orchestrator.ts ──fetch──►  api/ai.ts → server/ai/handle
   coach; quota errors show GEMINI LIMIT REACHED with USE BASIC COACH / VIEW USAGE.
 - **Usage** (`domain/aiUsage.ts`): the app logs metadata per request and estimates periods, RPM/TPM/RPD against
   limits the player copied from AI Studio (never invented), and warning levels with configurable thresholds.
+- **Model router** (`server/ai/registry.ts`, `router.ts`, `execute.ts`): discovery via `models.list` (cached per
+  instance), family-based capabilities (`getModelCapabilities`), Free Tier status (documented list +
+  `GEMINI_FREE_MODELS`), a route table in `src/ai/shared/models.ts` (requirements are hard filters, tier
+  preferences only order), per-model health with cooldowns (429 → retry delay / 60 s escalating; RPD → midnight PT;
+  quota 0 → not on this tier; 404 → unavailable), a Cost Guard before every call, `MAX_RETRIES = 2` with exponential
+  backoff for transient errors, and a 26 s deadline under Vercel's 30 s limit. The app keeps its own copy of model
+  health (`services/ai/routerState.ts`, `domain/aiRouter.ts`) and sends it as hints; the server merges them with its
+  instance memory. Responses carry `routing` (request type, model, reason, attempts, fallback) and the app records one
+  usage row per model attempt.
 - **Dev:** `vite.config.ts` mounts the same handlers under `/api/*` during `npm run dev` (reads `.env.local`).
 
 ## Notifications

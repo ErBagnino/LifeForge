@@ -5,7 +5,7 @@ import { ensureSeeded } from '../../seedService';
 import { beginAdventure } from '../../game/dayService';
 import { clock } from '../../clock';
 import { loadChat } from '../../coachService';
-import { answerWithBasicCoach, applyAll, resolveAction, sendMessage, undoAction } from '../orchestrator';
+import { answerWithBasicCoach, applyAll, resolveAction, retryLast, sendMessage, undoAction } from '../orchestrator';
 
 let n = 0;
 async function fresh() {
@@ -168,5 +168,97 @@ describe('AI orchestrator', () => {
     const denied = await resolveAction(state, msg.id, card.id, 'apply', 'reset');
     expect(denied.state.messages.find((m) => m.id === msg.id)!.actions![0].status).toBe('pending');
     expect(await settingsRepository.get()).toBeDefined();
+  });
+});
+
+describe('model router integration (client side)', () => {
+  beforeEach(fresh);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sends routing prefs (Free Tier only, request id, intent) and records one usage row per model attempt', async () => {
+    const attempts = [
+      { model: 'gemini-2.5-flash-lite', outcome: 'rate_limited', status: 429, latencyMs: 120, quota: { limitType: 'rpm', retryAfterSec: 30 }, cooldownUntil: Date.now() + 30_000 },
+      { model: 'gemini-2.5-flash', outcome: 'ok', latencyMs: 900 },
+    ];
+    const { bodies } = apiReplies({ body: { ...say('Ciao!'), model: 'gemini-2.5-flash', routing: { requestType: 'TEXT_CHAT', model: 'gemini-2.5-flash', reason: 'gemini-2.5-flash-lite failed (rate limited); switched to fallback gemini-2.5-flash', fallback: true, attempts, freeTierOnly: true } } });
+    const { state } = await sendMessage(await loadChat(), { text: 'Che cosa devo fare oggi?' });
+    const routing = (bodies[0] as { routing: { freeTierOnly: boolean; requestId: string; intent: string } }).routing;
+    expect(routing).toMatchObject({ freeTierOnly: true, intent: 'TEXT_CHAT' });
+    expect(routing.requestId).toMatch(/^r_/);
+    // Non-invasive note, no error, conversation continues.
+    expect(state.messages.at(-1)).toMatchObject({ text: 'Ciao!', notice: { kind: 'switched', text: 'AI model switched automatically.' } });
+    const rows = await getDb().aiUsage.toArray();
+    expect(rows.map((r) => [r.model, r.ok, r.status])).toEqual([
+      ['gemini-2.5-flash-lite', false, 429],
+      ['gemini-2.5-flash', true, 200],
+    ]);
+    expect(rows[1]).toMatchObject({ inputTokens: 1000, fallback: true });
+    // The next request tells the server that the first model is cooling down.
+    const next = apiReplies({ body: say('Ok') });
+    await sendMessage(state, { text: 'E domani?' });
+    const hints = (next.bodies[0] as { routing: { hints: Record<string, { cooldownUntil?: number; status?: string }> } }).routing.hints;
+    expect(hints['gemini-2.5-flash-lite']).toMatchObject({ status: 'RATE_LIMITED' });
+    expect(hints['gemini-2.5-flash-lite'].cooldownUntil).toBeGreaterThan(Date.now());
+  });
+
+  it('keeps the same model for the rest of a turn (lastModel) when resuming after confirmation', async () => {
+    apiReplies({ body: { ...call('updateWaterGoal', { targetMl: 2400 }), model: 'gemini-2.5-flash' } });
+    const r1 = await sendMessage(await loadChat(), { text: 'Acqua 2,4 litri' });
+    const msg = r1.state.messages.at(-1)!;
+    const { bodies } = apiReplies({ body: say('Fatto.') });
+    await resolveAction(r1.state, msg.id, msg.actions![0].id, 'apply');
+    expect((bodies[0] as { routing: { lastModel: string } }).routing.lastModel).toBe('gemini-2.5-flash');
+  });
+
+  it('no compatible model → "temporarily unavailable" card with TRY AGAIN, never a crash', async () => {
+    apiReplies({ status: 503, body: { error: { kind: 'no_model', message: 'Gemini is temporarily unavailable for this type of request.', routing: { attempts: [], retryAt: Date.now() + 120_000 } } } });
+    const { state } = await sendMessage(await loadChat(), { text: 'Organizzami la settimana' });
+    expect(state.messages.at(-1)).toMatchObject({ notice: { kind: 'no_model', text: 'GEMINI UNAVAILABLE' } });
+    expect(state.messages.at(-1)!.text).toMatch(/temporarily unavailable for this type of request.*about 2 min/);
+    apiReplies({ status: 403, body: { error: { kind: 'cost_blocked', message: 'This model cannot be verified as Free Tier.' } } });
+    const r2 = await retryLast(state);
+    expect(r2.state.messages.at(-1)).toMatchObject({ text: 'This model cannot be verified as Free Tier.', notice: { kind: 'no_model', text: 'NO VERIFIED FREE TIER MODEL' } });
+  });
+
+  it('simple commands are handled on the device without calling Gemini', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const water = (await questRepository.byDate('2026-09-23')).find((q) => /water/i.test(q.title) && q.status === 'pending');
+    expect(water).toBeDefined();
+    const { state } = await sendMessage(await loadChat(), { text: 'Segna acqua completata' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const msg = state.messages.at(-1)!;
+    expect(msg.local).toBe(true);
+    expect(msg.actions?.[0]).toMatchObject({ name: 'completeQuest', status: 'applied' });
+    expect((await questRepository.get(water!.id))!.status).toBe('completed');
+    const t = await sendMessage(state, { text: 'Porta le calorie a 1900' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(t.state.messages.at(-1)!.actions?.[0]).toMatchObject({ name: 'updateNutritionTargets', status: 'pending' });
+  });
+
+  it('idempotency: the same tool call is never executed twice', async () => {
+    const { prepare, execute } = await import('../tools/registry');
+    const p = await prepare({ name: 'scheduleOneTimeActivity', args: { title: 'Dentist', date: '2026-09-25', durationMin: 30, category: 'personal_care' } });
+    if (!p.ok || p.kind !== 'action') throw new Error('prepare failed');
+    const a = await execute(p.action, { source: 'gemini', idempotencyKey: 'r_1:0:c1' });
+    const b = await execute(p.action, { source: 'gemini', idempotencyKey: 'r_1:0:c1' });
+    expect(a.result.success).toBe(true);
+    expect(b.result).toMatchObject({ success: true, duplicate: true });
+    expect((await questRepository.byDate('2026-09-25')).filter((q) => q.title === 'Dentist')).toHaveLength(1);
+  });
+
+  it('a replayed Gemini step (same calls) does not auto-complete a quest twice', async () => {
+    const q = (await questRepository.byDate('2026-09-23')).find((x) => x.status === 'pending' && !x.target)!;
+    const step = { ...call('completeQuest', { questId: q.id }, 'dup'), model: 'gemini-2.5-flash' };
+    apiReplies({ body: step }, { body: say('Fatto.') });
+    const r1 = await sendMessage(await loadChat(), { text: 'Ho finito la quest' });
+    expect(r1.state.messages.some((m) => m.actions?.some((c) => c.status === 'applied'))).toBe(true);
+    const xp = (await getDb().player.get('me'))!.xp;
+    // Undo + replay of the same request must not create a second completion reward loop.
+    const { execute, prepare } = await import('../tools/registry');
+    const p = await prepare({ name: 'completeQuest', args: { questId: q.id } });
+    expect(p.ok).toBe(false); // already completed → refused, nothing runs
+    if (p.ok && p.kind === 'action') await execute(p.action, { source: 'gemini' });
+    expect((await getDb().player.get('me'))!.xp).toBe(xp);
   });
 });

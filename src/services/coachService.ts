@@ -1,5 +1,5 @@
 import { type AssistantContext, type ConfigChange, type Pending, type Proposal, type QuickReply, respond, withWorkDays } from '@/domain/coachAssistant';
-import { ruleIntent, type RuleToolCall } from '@/domain/ruleIntents';
+import { completionIntent, ruleIntent, type RuleToolCall } from '@/domain/ruleIntents';
 import { profileFields } from '@/domain/profile';
 import { describeWork, resolveEntry, summarizeSchedule, workFromPlan } from '@/domain/schedule';
 import { metaRepository, questRepository, settingsRepository, statsRepository } from '@/repositories';
@@ -49,6 +49,8 @@ export interface ChatMessage {
   notice?: { kind: string; text: string };
   /** The user attached a photo (the photo itself is not kept). */
   photo?: boolean;
+  /** Handled on the device without any AI request. */
+  local?: boolean;
 }
 
 export type ActionStatus = 'pending' | 'applied' | 'cancelled' | 'failed' | 'undone';
@@ -77,6 +79,10 @@ export interface AwaitingTurn {
   contents: { role: 'user' | 'model'; parts: Record<string, unknown>[] }[];
   calls: { id?: string; name: string; args: Record<string, unknown>; result?: Record<string, unknown> }[];
   step: number;
+  /** Request id of the step that produced these calls (idempotency keys). */
+  stepId?: string;
+  /** Model that produced the paused step (the router keeps it when healthy). */
+  model?: string;
 }
 
 export interface ChatState {
@@ -230,8 +236,8 @@ export function describeChanges(changes: ConfigChange[], today: ISODate): string
 // ——— Conversation ———
 
 /** Turn basic-coach tool calls into action cards (validated + previewed, nothing applied). */
-export async function ruleCards(calls: RuleToolCall[]): Promise<ActionCard[]> {
-  const { prepare } = await import('./ai/tools/registry');
+export async function ruleCards(calls: RuleToolCall[], events?: ServiceResult['events']): Promise<ActionCard[]> {
+  const { prepare, execute } = await import('./ai/tools/registry');
   const cards: ActionCard[] = [];
   for (const call of calls) {
     const p = await prepare(call);
@@ -239,7 +245,14 @@ export async function ruleCards(calls: RuleToolCall[]): Promise<ActionCard[]> {
       cards.push({ id: uid('a_'), name: call.name, args: call.args, permission: 'write', title: call.name, lines: [], warnings: [], undoable: false, status: 'failed', result: p.result.message });
     } else if (p.kind === 'action') {
       const a = p.action;
-      cards.push({ id: uid('a_'), name: a.call.name, args: a.call.args, permission: a.permission, title: a.title, lines: a.lines, warnings: a.warnings, confirmPhrase: a.confirmPhrase, undoable: a.undoable, status: 'pending' });
+      const card: ActionCard = { id: uid('a_'), name: a.call.name, args: a.call.args, permission: a.permission, title: a.title, lines: a.lines, warnings: a.warnings, confirmPhrase: a.confirmPhrase, undoable: a.undoable, status: 'pending' };
+      if (a.permission === 'low') {
+        // Low-risk (complete/skip): applied right away, with Undo — same as with Gemini.
+        const r = await execute(a, { source: 'rules', idempotencyKey: `card:${card.id}` });
+        events?.push(...r.events);
+        Object.assign(card, { status: r.result.success ? 'applied' : 'failed', result: r.result.message, changeId: r.result.changeId, undoable: !!r.result.changeId });
+      }
+      cards.push(card);
     }
   }
   return cards;
@@ -258,13 +271,19 @@ export async function sendMessage(state: ChatState, input: { text: string; value
   const reply = respond(input, ctx, state.pending);
   const coach: ChatMessage = { id: uid('m_'), role: 'coach', text: reply.text, ts: Date.now(), quick: reply.quick };
   let result: ServiceResult | undefined;
+  const ruleEvents: ServiceResult['events'] = [];
+  const completion = !reply.understood && !input.value ? completionIntent(input.text, (await questRepository.byDate(today)).filter((q) => q.status === 'pending')) : undefined;
 
   if (input.value?.startsWith('tool:')) {
     // Quick reply that names a tool (e.g. the reset clarification).
     const name = input.value.slice(5);
     coach.text = 'Check this before confirming:';
     coach.quick = undefined;
-    coach.actions = await ruleCards([{ name, args: {} }]);
+    coach.actions = await ruleCards([{ name, args: {} }], ruleEvents);
+  } else if (completion) {
+    coach.quick = undefined;
+    coach.actions = await ruleCards([completion], ruleEvents);
+    coach.text = coach.actions[0]?.status === 'applied' ? 'Done ✓ — tap Undo if that was a mistake.' : (coach.actions[0]?.result ?? 'I couldn’t complete that quest.');
   } else if (!reply.understood) {
     const intent = ruleIntent(input.text, today);
     if (intent?.kind === 'ask') {
@@ -273,7 +292,7 @@ export async function sendMessage(state: ChatState, input: { text: string; value
     } else if (intent?.kind === 'tools') {
       coach.text = intent.text;
       coach.quick = undefined;
-      const cards = await ruleCards(intent.calls);
+      const cards = await ruleCards(intent.calls, ruleEvents);
       const failed = cards.filter((a) => a.status === 'failed');
       coach.actions = cards.filter((a) => a.status !== 'failed');
       // A call that can't be previewed (already set, out of bounds…) is explained in text, not as a card.
@@ -296,6 +315,7 @@ export async function sendMessage(state: ChatState, input: { text: string; value
     coach.proposal = reply.proposal;
     if (reply.proposal.status === 'applied') result = await applyChanges(reply.proposal.changes);
   }
+  if (ruleEvents.length) result = { events: [...(result?.events ?? []), ...ruleEvents] };
   if (coach.proposal?.status === 'pending') coach.proposal = { ...coach.proposal, impact: await impactOf(coach.proposal, settings, today) };
   messages.push(coach);
   return { state: await save({ messages, pending: reply.pending }), result };

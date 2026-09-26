@@ -3,7 +3,7 @@ import type { AiUsageRecord, AiUsageSettings } from '@/types';
 import { levelFor, summarizeUsage, usageBadge } from '../aiUsage';
 
 const NOW = new Date('2026-09-23T15:00:00').getTime();
-const base: AiUsageSettings = { tracking: true, limits: {}, thresholds: { notice: 70, warning: 85, critical: 95 } };
+const base: AiUsageSettings = { tracking: true, limits: {}, modelLimits: {}, thresholds: { notice: 70, warning: 85, critical: 95 } };
 let id = 0;
 const rec = (minsAgo: number, patch: Partial<AiUsageRecord> = {}): AiUsageRecord => ({ id: `u${++id}`, ts: NOW - minsAgo * 60_000, model: 'gemini-flash-latest', type: 'chat', inputTokens: 1000, outputTokens: 50, totalTokens: 1050, ok: true, status: 200, latencyMs: 900, image: false, ...patch });
 

@@ -1,7 +1,10 @@
 import { create } from 'zustand';
+import type { ModelsResponse } from '@/ai/shared/models';
+import { EMPTY_STATS, modelUsage, type ModelUsage, type RouterStats } from '@/domain/aiRouter';
 import type { UsageSummary } from '@/domain/aiUsage';
 import { geminiProvider, type StatusResponse } from '@/services/ai/gemini';
-import { getUsageSummary, onUsageChange } from '@/services/ai/usageService';
+import { getRouterStats, onRouterChange } from '@/services/ai/routerState';
+import { getUsageSummary, onUsageChange, usageRecords } from '@/services/ai/usageService';
 
 /** Wizard/status states shown in Settings → AI. */
 export type AiUiState = 'not_connected' | 'connecting' | 'connected' | 'error' | 'quota' | 'invalid_key' | 'server_error' | 'offline';
@@ -11,6 +14,14 @@ interface AiStore {
   ui: AiUiState;
   checkedAt?: number;
   usage?: UsageSummary;
+  /** Models discovered by the server router (capabilities, Free Tier status, routes). */
+  models?: ModelsResponse;
+  modelsLoading: boolean;
+  /** Local router memory: current/last model, fallbacks, cooldowns, learned limits. */
+  router: RouterStats;
+  /** Per-model usage from this device's request log (app estimate). */
+  perModel: Record<string, ModelUsage>;
+  refreshModels(refresh?: boolean): Promise<void>;
   /** Check the connection. `test` sends one tiny real request (Test connection button). */
   check(opts?: { test?: boolean; force?: boolean }): Promise<StatusResponse | undefined>;
   refreshUsage(): Promise<void>;
@@ -34,6 +45,9 @@ export function uiState(s?: StatusResponse): AiUiState {
       return 'offline';
     case 'server':
       return 'server_error';
+    case 'no_model':
+    case 'cost_blocked':
+      return 'error';
     default:
       return 'error';
   }
@@ -44,6 +58,18 @@ let pending: Promise<StatusResponse | undefined> | undefined;
 
 export const useAi = create<AiStore>((set, get) => ({
   ui: 'not_connected',
+  modelsLoading: false,
+  router: EMPTY_STATS,
+  perModel: {},
+  async refreshModels(refresh = false) {
+    set({ modelsLoading: true });
+    try {
+      const models = await geminiProvider.models(refresh);
+      if (models) set({ models });
+    } finally {
+      set({ modelsLoading: false });
+    }
+  },
   async check(opts = {}) {
     const fresh = get().checkedAt && Date.now() - get().checkedAt! < TTL;
     if (!opts.test && !opts.force && fresh) return get().status;
@@ -66,7 +92,8 @@ export const useAi = create<AiStore>((set, get) => ({
     return pending;
   },
   async refreshUsage() {
-    set({ usage: await getUsageSummary() });
+    const [usage, router, records] = await Promise.all([getUsageSummary(), getRouterStats(), usageRecords()]);
+    set({ usage, router, perModel: modelUsage(records) });
   },
   noteError(kind) {
     const status = get().status;
@@ -76,6 +103,7 @@ export const useAi = create<AiStore>((set, get) => ({
 }));
 
 onUsageChange(() => void useAi.getState().refreshUsage());
+onRouterChange(() => void useAi.getState().refreshUsage());
 
 /** Gemini can be used right now (connected and enabled in settings). */
 export function geminiReady(enabled: boolean): boolean {

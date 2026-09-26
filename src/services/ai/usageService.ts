@@ -28,6 +28,19 @@ export async function recordUsage(r: Omit<AiUsageRecord, 'id'>): Promise<void> {
   listeners.forEach((l) => l());
 }
 
+/** Record several attempts of one request (router fallbacks) in one go. */
+export async function recordUsageMany(list: Omit<AiUsageRecord, 'id'>[]): Promise<void> {
+  if (!list.length) return;
+  try {
+    const s = await settingsRepository.get();
+    if (s && !s.coach.ai.usage.tracking) return;
+    await getDb().aiUsage.bulkPut(list.map((r) => ({ ...r, id: uid('u_') })));
+  } catch {
+    // tracking must never break a request
+  }
+  listeners.forEach((l) => l());
+}
+
 export async function usageRecords(): Promise<AiUsageRecord[]> {
   return getDb().aiUsage.toArray();
 }

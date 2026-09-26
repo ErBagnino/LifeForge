@@ -41,6 +41,11 @@ export interface AiSettings {
   foodVision: boolean;
   /** Keep a small thumbnail of scanned meals on this device. OFF by default. */
   savePhotos: boolean;
+  /**
+   * Cost Control: only models verified as Gemini Free Tier are used. The server
+   * additionally requires GEMINI_ALLOW_PAID=true before any other model can run.
+   */
+  freeTierOnly: boolean;
   usage: AiUsageSettings;
 }
 
@@ -50,8 +55,10 @@ export interface AiSettings {
  */
 export interface AiUsageSettings {
   tracking: boolean;
-  /** Limits as shown in Google AI Studio for the current model/project (optional). */
+  /** @deprecated Single-model limits from before the model router; see `modelLimits`. */
   limits: { rpm?: number; tpm?: number; rpd?: number };
+  /** Per-model limits copied from Google AI Studio (number, "unlimited", or absent = unknown). */
+  modelLimits: Record<string, { rpm?: number | 'unlimited'; tpm?: number | 'unlimited'; rpd?: number | 'unlimited' }>;
   /** Warning thresholds in percent of those limits. */
   thresholds: { notice: number; warning: number; critical: number };
 }

@@ -36,3 +36,29 @@ describe('basic-coach tool intents', () => {
     expect(findDate('dopodomani', TODAY)).toBe('2026-09-25');
   });
 });
+
+describe('on-device commands (no AI call)', () => {
+  const quests = [
+    { id: 'q1', title: 'Drink water (2.3 L)' },
+    { id: 'q5', title: "Change Sky's water" },
+    { id: 'q6', title: 'Drink a glass of water' },
+    { id: 'q2', title: 'Upper A workout' },
+    { id: 'q3', title: 'Read 20 pages' },
+    { id: 'q4', title: 'Read an article' },
+  ];
+  it('matches a single pending quest, IT/EN, with synonyms', async () => {
+    const { completionIntent } = await import('../ruleIntents');
+    expect(completionIntent('Segna acqua completata', quests)).toEqual({ name: 'completeQuest', args: { questId: 'q1' } });
+    expect(completionIntent('Ho fatto la palestra', quests)).toEqual({ name: 'completeQuest', args: { questId: 'q2' } });
+    expect(completionIntent('mark reading done', quests)).toBeUndefined(); // two "read" quests → ambiguous, don't guess
+    expect(completionIntent('Come sto andando?', quests)).toBeUndefined();
+  });
+  it('isLocalCommand: targets, reset clarification and completions stay on the device', async () => {
+    const { isLocalCommand } = await import('../ruleIntents');
+    expect(isLocalCommand('Porta le calorie a 1900 kcal', TODAY, quests)).toBe(true);
+    expect(isLocalCommand('Segna acqua completata', TODAY, quests)).toBe(true);
+    expect(isLocalCommand('Voglio ricominciare da zero', TODAY, quests)).toBe(true);
+    expect(isLocalCommand('Crea una challenge basata sui miei progressi', TODAY, quests)).toBe(false);
+    expect(isLocalCommand('Organizzami la settimana', TODAY, quests)).toBe(false);
+  });
+});

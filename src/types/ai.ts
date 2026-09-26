@@ -21,6 +21,9 @@ export interface AiUsageRecord {
   errorKind?: string;
   latencyMs: number;
   image: boolean;
+  /** Router request type (TEXT_CHAT, FOOD_IMAGE…) and whether this attempt was a fallback. */
+  requestType?: string;
+  fallback?: boolean;
   /** Google's own details for a quota error (authoritative when present). */
   quota?: { limitType?: 'rpm' | 'tpm' | 'rpd' | 'tpd' | 'other'; quotaValue?: number; retryAfterSec?: number };
 }
