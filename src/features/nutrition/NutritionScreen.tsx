@@ -66,12 +66,15 @@ export default function NutritionScreen() {
         </p>
       </Card>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button size="lg" icon="camera" className="!px-3 whitespace-nowrap" onClick={() => navigate('/nutrition/scan')}>
-          Take Photo
+      <Button block size="lg" icon="camera" className="mt-3 !h-16 !text-[18px]" data-tour="scan-food" onClick={() => navigate('/nutrition/scan')}>
+        SCAN FOOD
+      </Button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button variant="secondary" icon="plus" className="!px-3 whitespace-nowrap" onClick={() => setAdding(true)}>
+          Add manually
         </Button>
-        <Button size="lg" variant="secondary" icon="plus" className="!px-3 whitespace-nowrap" onClick={() => setAdding(true)}>
-          Add food
+        <Button variant="secondary" icon="chat" className="!px-3 whitespace-nowrap" onClick={() => navigate('/coach', { state: { draft: 'How is my nutrition today?' } })}>
+          Ask Coach
         </Button>
       </div>
 
@@ -97,7 +100,7 @@ export default function NutritionScreen() {
 
       <SectionTitle>Today’s meals</SectionTitle>
       {!meals?.length ? (
-        <EmptyState icon="🍽️" title="No meals yet" body="Snap a photo or add food in a few taps. Rough is fine." />
+        <EmptyState icon="🍽️" title="No meals yet" body="Scan your plate or add food in a few taps. Rough is fine." />
       ) : (
         <div className="space-y-2">
           {meals.map((m) => (
@@ -111,9 +114,13 @@ export default function NutritionScreen() {
                   </span>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-semibold">{m.name}</div>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-[15px] font-semibold">{m.name}</span>
+                    {m.source === 'ai' && <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[9px] font-extrabold tracking-[0.12em] text-accent">AI ESTIMATE</span>}
+                  </div>
                   <div className="num text-[12px] text-muted">
-                    {tsToHm(m.ts)} · {formatInt(m.kcal)} kcal · {formatInt(m.protein)} g P
+                    {tsToHm(m.ts)} · {m.source === 'ai' ? '~' : ''}
+                    {formatInt(m.kcal)} kcal · {formatInt(m.protein)} g P{m.estimate?.corrected || m.estimate?.edited ? ' · corrected' : ''}
                   </div>
                   <div className="truncate text-[12px] text-faint">{m.items.map((i) => i.name).join(', ')}</div>
                 </div>

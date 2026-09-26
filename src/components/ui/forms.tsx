@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { haptics } from '@/services/haptics';
 import { Icon, type IconName } from './Icon';
 import { cx } from './primitives';
+import { VoiceMic } from './VoiceMic';
 
 export function Toggle({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
@@ -115,7 +116,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
-export function TextInput({ value, onChange, placeholder, type = 'text', inputMode, autoFocus, className, ...rest }: {
+export function TextInput({ value, onChange, placeholder, type = 'text', inputMode, autoFocus, className, voice, ...rest }: {
   value: string | number;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -125,7 +126,17 @@ export function TextInput({ value, onChange, placeholder, type = 'text', inputMo
   className?: string;
   'aria-label'?: string;
   maxLength?: number;
+  /** Show a microphone that dictates into the field. */
+  voice?: boolean;
 }) {
+  if (voice) {
+    return (
+      <div className={cx('relative', className)}>
+        <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} inputMode={inputMode} autoFocus={autoFocus} className={cx(inputBase, 'pr-12')} {...rest} />
+        <VoiceMic className="absolute top-1/2 right-1.5 -translate-y-1/2" onText={(t) => onChange(t)} />
+      </div>
+    );
+  }
   return (
     <input
       value={value}

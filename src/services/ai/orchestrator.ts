@@ -33,6 +33,8 @@ export interface TurnInput {
 export interface TurnResult {
   state: ChatState;
   result?: ServiceResult;
+  /** All data was deleted: the app must restart. */
+  reload?: boolean;
 }
 
 let controller: AbortController | undefined;
@@ -239,7 +241,7 @@ export async function resolveAction(state: ChatState, messageId: string, cardId:
     state = patchCard(state, messageId, cardId, { status: result.success ? 'applied' : 'failed', result: result.message, changeId: result.changeId, undoable: !!result.changeId });
     if (result.success && found.card.name === 'resetAllData') {
       // Everything is gone (including this chat): the app restarts from onboarding.
-      return { state: { messages: [] }, result: { events: [{ type: 'toast', text: 'All data deleted. Restarting…', icon: '🧹', tone: 'info' }] } };
+      return { state: { messages: [] }, result: { events: [] }, reload: true };
     }
   }
 

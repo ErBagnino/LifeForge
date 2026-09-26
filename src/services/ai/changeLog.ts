@@ -96,7 +96,7 @@ export async function undoChange(id: string): Promise<UndoResult> {
   if (change.undoneAt) return { success: false, message: 'Already undone.', events: [] };
   if (!change.undo) return { success: false, message: 'This change can’t be undone.', events: [] };
   const db = getDb();
-  let events: ServiceResult['events'] = [];
+  let events: ServiceResult['events'];
 
   if (change.undo.kind === 'uncomplete') {
     const q = await db.quests.get(change.undo.questId);

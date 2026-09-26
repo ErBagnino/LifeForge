@@ -6,6 +6,7 @@ import { APP_CONFIG } from '@/config/app';
 import { profileFields } from '@/domain/profile';
 import { saveSettings } from '@/services/adminService';
 import { clock } from '@/services/clock';
+import { useAi } from '@/store/aiStore';
 import { useGame } from '@/store/gameStore';
 
 export default function SettingsScreen() {
@@ -13,9 +14,11 @@ export default function SettingsScreen() {
   const settings = useGame((s) => s.settings);
   const refresh = useGame((s) => s.refresh);
   const [taps, setTaps] = useState(0);
+  const ui = useAi((s) => s.ui);
   if (!settings) return null;
   const go = (section: string) => () => navigate(`/settings/${section}`);
   const fields = profileFields(settings, clock.today());
+  const aiLabel = { connected: 'connected', connecting: 'checking…', quota: 'limit reached', not_connected: 'not connected', invalid_key: 'invalid key', server_error: 'server error', error: 'error', offline: 'offline' }[ui];
   return (
     <Screen back title="Settings">
       <List>
@@ -31,7 +34,7 @@ export default function SettingsScreen() {
       </List>
       <List title="System">
         <Row icon="🔔" iconBg="#ffe3d3" title="Notifications" subtitle={settings.notifications.enabled ? 'On' : 'Off'} onClick={go('notifications')} />
-        <Row icon="🧠" iconBg="#e8e0ff" title="Coach & AI" subtitle={settings.coach.ai.enabled ? 'On-device + your AI key' : 'On-device · voice'} onClick={go('coach')} />
+        <Row icon="✨" iconBg="#ececf0" title="AI" subtitle={settings.coach.ai.enabled ? `Gemini · ${aiLabel} · usage` : 'Off · basic coach'} onClick={go('ai')} />
         <Row icon="💾" iconBg="#e3f4ff" title="Data" subtitle="Export / import JSON backup" onClick={go('data')} />
         <Row icon="🛠️" iconBg="#ececf0" title="Admin" subtitle="Activities, rules, economy, AI import" onClick={() => navigate('/admin')} />
         {settings.devMode && <Row icon="🧪" title="Developer toolbox" onClick={() => navigate('/dev')} />}
@@ -48,7 +51,7 @@ export default function SettingsScreen() {
           }
         }}
       >
-        {APP_CONFIG.displayName} v{APP_CONFIG.version} · data stays on this device
+        {APP_CONFIG.displayName} v{APP_CONFIG.version} · game data stays on this device
         {taps >= 3 && !settings.devMode ? ` · ${7 - taps} taps to developer mode` : ''}
       </button>
     </Screen>

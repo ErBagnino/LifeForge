@@ -84,7 +84,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     };
   },
 
-  async getToday({}, { today }) {
+  async getToday(_a, { today }) {
     const { day, long } = await loadDay(today);
     const log = await statsRepository.getLog(today);
     return {
@@ -112,7 +112,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     };
   },
 
-  async getGoals({}, { today }) {
+  async getGoals(_a, { today }) {
     const long = await questRepository.longActive(today);
     return { goals: long.map((q) => ({ ...questRow(q), goal: q.goal, byPlayer: q.source === 'coach' })) };
   },
@@ -146,7 +146,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     return { sessions: sessions.map((s) => ({ date: s.date, name: s.name, kind: s.kind, status: s.status, ...sessionStats(s) })) };
   },
 
-  async getNutritionToday({}, { settings: s, today }) {
+  async getNutritionToday(_a, { settings: s, today }) {
     const [entries, meals] = await Promise.all([statsRepository.metricsByDate(today), statsRepository.mealsByDate(today)]);
     const sum = (t: string) => Math.round(entries.filter((e) => e.type === t).reduce((x, e) => x + e.value, 0));
     return {
@@ -182,7 +182,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     return { routines: routines.map((r) => ({ id: r.id, name: r.name, kind: r.kind, active: r.active, startTime: r.startTime ?? null, activities: r.activityIds.map((id) => ({ id, name: name.get(id) ?? '(deleted)' })) })) };
   },
 
-  async getStreaks({}, { player: p }) {
+  async getStreaks(_a, { player: p }) {
     const counters = await statsRepository.counters();
     const acts = await activityRepository.all();
     const name = new Map(acts.map((x) => [x.id, x.name]));
@@ -203,7 +203,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     };
   },
 
-  async getAchievementCounters({}, { player, settings }) {
+  async getAchievementCounters(_a, { player, settings }) {
     const values = await allCounters(player, settings);
     return {
       counters: COUNTER_CATALOG.map((c) => ({ ...c, current: values[c.key] ?? 0 })),
@@ -211,7 +211,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     };
   },
 
-  async getTycoonWorld({}, { player }) {
+  async getTycoonWorld(_a, { player }) {
     const b = await tycoonRepository.buildings.all();
     return {
       coins: player.coins,
@@ -220,15 +220,15 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     };
   },
 
-  async getEnergy({}, { player: p }) {
+  async getEnergy(_a, { player: p }) {
     return { energy: p.energy, maxEnergy: p.maxEnergy, hp: p.hp, recoveryMode: p.recoveryMode, effects: p.effects.map((e) => ({ label: e.label, description: e.description, until: e.expiresOn })), info: 'Energy starts each day from sleep and rest; quests cost energy, recovery activities restore it. HP drops when core quests are missed and recovers by completing them.' };
   },
 
-  async getStats({}, { player: p }) {
+  async getStats(_a, { player: p }) {
     return { stats: p.stats, level: p.level, lifetime: p.lifetime };
   },
 
-  async getSchedule({}, { settings: s, today }) {
+  async getSchedule(_a, { settings: s, today }) {
     const sch = activeSchedule(s.work, today);
     const temporary = await upcomingTemporary(today, 30);
     return {
@@ -251,7 +251,7 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     return { date, score: log.score, success: log.success, components: log.breakdown?.components.map((c) => ({ key: c.key, weight: c.weight, ratio: c.ratio === null ? null : Math.round(c.ratio * 100) / 100 })), bonus: log.breakdown?.bonus ?? 0 };
   },
 
-  async getWeeklySummary({}, { today }) {
+  async getWeeklySummary(_a, { today }) {
     const w = await weeklyReview(today);
     return { from: w.from, to: w.to, avgScore: w.avgScore, prevAvgScore: w.prevAvgScore, xp: w.xp, coins: w.coins, workouts: w.workouts, avgSteps: w.avgSteps, successDays: Math.round(w.consistency * 7), coreRate: w.coreRate === null ? null : Math.round(w.coreRate * 100), strongest: w.strongest ?? null, weakest: w.weakest ?? null };
   },

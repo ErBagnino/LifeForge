@@ -136,6 +136,8 @@ export interface Meal {
   photo?: string;
   source: 'manual' | 'preset' | 'photo' | 'ai';
   note?: string;
+  /** Present when the values came from a Gemini photo estimate (always approximate). */
+  estimate?: { confidence: 'low' | 'medium' | 'high'; corrected: boolean; edited: boolean };
 }
 
 /** A per-day override of the weekly schedule. */

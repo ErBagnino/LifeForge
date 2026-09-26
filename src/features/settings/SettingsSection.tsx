@@ -16,7 +16,7 @@ import { notificationService } from '@/services/notifications/NotificationServic
 import { rescheduleReminders } from '@/services/notifications/reminderScheduler';
 import { useGame } from '@/store/gameStore';
 import { SchedulePanel } from './SchedulePanel';
-import { CoachPanel } from './CoachPanel';
+import { AiPanel } from './AiPanel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { goalLabel, profileFields } from '@/domain/profile';
 import type { CoachTone, GameDifficulty, NotificationType, Settings, ThemeMode } from '@/types';
@@ -46,7 +46,8 @@ const TITLES: Record<string, string> = {
   safety: 'Safety bounds',
   notifications: 'Notifications',
   data: 'Data',
-  coach: 'Coach & AI',
+  coach: 'AI',
+  ai: 'AI',
 };
 
 export default function SettingsSection() {
@@ -62,7 +63,8 @@ export default function SettingsSection() {
     safety: <SafetyPanel />,
     notifications: <NotificationsPanel />,
     data: <DataPanel />,
-    coach: <CoachPanel />,
+    coach: <AiPanel />,
+    ai: <AiPanel />,
   };
   return (
     <Screen back="/settings" title={TITLES[section] ?? 'Settings'}>
