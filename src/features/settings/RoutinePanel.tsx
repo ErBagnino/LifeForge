@@ -40,29 +40,37 @@ export function RoutinePanel() {
         <Row
           title="Planned wake-up"
           right={
-            <TimeInput
+            <div className="w-[140px] shrink-0">
+              <TimeInput
               value={settings.schedule.wake}
               onChange={(v) => void save({ schedule: { ...settings.schedule, wake: v }, known: { ...settings.known, wake: 'set' } }).then(() => rebuildDay(clock.today()))}
               aria-label="Planned wake-up"
-              className="!h-11 w-[120px]"
+              className="!h-11 !px-3"
             />
+            </div>
           }
         />
         <Row
           title="Bedtime"
           right={
-            <TimeInput
+            <div className="w-[140px] shrink-0">
+              <TimeInput
               value={settings.schedule.sleep}
               onChange={(v) => void save({ schedule: { ...settings.schedule, sleep: v }, known: { ...settings.known, sleep: 'set' } }).then(() => rebuildDay(clock.today()))}
               aria-label="Bedtime"
-              className="!h-11 w-[120px]"
+              className="!h-11 !px-3"
             />
+            </div>
           }
         />
         <Row
           title="Woke up today"
           subtitle={wakeToday ? `${tsToHm(wakeToday)} · ${context?.ctx.wakeSource ?? ''}` : 'Not recorded'}
-          right={<TimeInput value={wakeToday ? tsToHm(wakeToday) : ''} onChange={(v) => v && void confirmWake(dateTimeToTs(clock.today(), v, settings.dayStartHour), 'manual').then(refresh)} aria-label="Set wake-up time manually" className="!h-11 w-[120px]" />}
+          right={
+            <div className="w-[140px] shrink-0">
+              <TimeInput value={wakeToday ? tsToHm(wakeToday) : ''} onChange={(v) => v && void confirmWake(dateTimeToTs(clock.today(), v, settings.dayStartHour), 'manual').then(refresh)} aria-label="Set wake-up time manually" className="!h-11 !px-3" />
+            </div>
+          }
         />
         <Row title="Typical wake-up (weekdays)" subtitle={learnedText(learned?.wake.weekday)} />
         <Row title="Typical wake-up (weekend)" subtitle={learnedText(learned?.wake.weekend)} />

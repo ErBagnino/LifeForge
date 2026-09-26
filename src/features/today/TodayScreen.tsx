@@ -124,7 +124,6 @@ export default function TodayScreen() {
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-muted">{formatDate(date, 'EEEE d MMMM')}</div>
           <h1 className="text-[28px] leading-tight font-extrabold tracking-tight">{ramp?.label ? `Day ${dayIndex + 1}` : 'Today'}</h1>
-          <ContextChip />
         </div>
         <button type="button" onClick={() => setDayOpen(true)} className="flex min-h-11 shrink-0 flex-col items-end justify-center gap-1" aria-label="Today setup">
           <Chip icon={dayLabel.icon}>
@@ -136,6 +135,7 @@ export default function TodayScreen() {
           </Chip>
         </button>
       </div>
+      <ContextChip />
       <p className="mt-1 text-[15px] text-muted">{line}</p>
       {context?.openWork && !showAll ? (
         <>

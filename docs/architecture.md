@@ -126,6 +126,32 @@ travel. Everything calls `clock.now()` / `clock.today()`.
 - Missing info is modelled explicitly: `Settings.known` holds `set | not_set | unknown` per field, and
   `domain/profile.ts` presents fields as SET / NOT SET / OPTIONAL. Nothing treats a missing value as an error.
 
+## Daily context & adaptive schedule
+
+```
+taps (wake YES/manual, START/END WORK, START DAY) ─► services/contextService.ts ─► dayContexts (Dexie v4) + meta.workSession
+clock + settings + quests + learned patterns ─► domain/dailyContext.ts evaluateDay() ─► DailyContextView (state, time budget, priorities, focus)
+                                                             dailyOpening() ─► Opening (morning/afternoon/evening, wake ask/confirm, welcome back)
+```
+- **Stored facts vs computed view.** Only what the player tells the app is stored; `ContextState`
+  (`SLEEP · WAKE_UP · MORNING · AFTERNOON · WEEKEND · WORK · POST_WORK · TRAINING · EVENING · WIND_DOWN`), available
+  minutes, fit and priorities are pure functions of facts + clock, recomputed in `gameStore.refresh()` (`context`).
+- **Game day.** Everything uses the game date (`dayStartHour`, default 04:00) and local time; minutes after midnight
+  count as `1440+` so a 01:00 bedtime stays "today".
+- **Priorities** (`prioritize`): tier base + streak at risk + scheduled time + deadline pressure (minutes left vs
+  duration) + energy + time-of-day affinity → CRITICAL / IMPORTANT / NORMAL / OPTIONAL with a reason. Work Mode holds
+  quests (suspended, not failed). Below 30 % energy, heavy quests get a reduced alternative.
+- **Learning** (`learnSchedule`): medians over ≥ 3 observations, weekday vs weekend wake-up, workdays by weekday,
+  meal and workout times; honours `routine.adaptive` and `routine.learnedSince` (reset). Adaptive time suggestions,
+  learned workout times and learned reminder times are all gated on the same switch. Nothing is applied silently.
+- **Reminders** use quiet windows (`applyQuietWindows`): during work (until the typical end), an active workout and
+  play time, only allowed kinds are delivered.
+- **Snooze** targets are context-aware (`postponeContext`): After work, After dinner and Weekend appear only when known.
+- **AI**: `services/ai/dailyContextSummary.ts` builds the summary for `buildContext` and the `getDailyContext`
+  read tool; unknown fields are `"unknown"` and the system prompt forbids inventing them.
+- **Privacy**: no geolocation API, no background tasks; the data never leaves the device except the summary inside
+  a chat request the player sends.
+
 ## Coach (configuration assistant)
 ```
 text ─► domain/nlu.ts (normalize → days/scope/times/numbers → Intent[])

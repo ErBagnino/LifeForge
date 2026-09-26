@@ -8,7 +8,7 @@ Types live in `src/types/*`.
 
 | Table | Primary key | Indexes | Contents |
 | --- | --- | --- | --- |
-| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `adventureStart` (Day 1, drives the first-week ramp), `leisureTimer` (running play-time timer), `coachChat` (Coach history, pending question, short Gemini transcript, paused AI turn), `tutorial` (tour done). |
+| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `adventureStart` (Day 1, drives the first-week ramp), `leisureTimer` (running play-time timer), `coachChat` (Coach history, pending question, short Gemini transcript, paused AI turn), `tutorial` (tour done), `workSession` (open START WORK timer `{start}`), `lastVisitDate` / `previousVisitDate` (for "Welcome back"). |
 | `player` | `id` | | Single row `"me"`: xp, coins, hp, energy, stats, streak state, inventory (freezes, revives, rerolls), boosts, status effects, recovery mode, avatar, unlocked features. |
 | `settings` | `id` | | Single row `"settings"`: profile (goals, focus, optional future goals), rhythm (wake/sleep, busy blocks, training availability), **work** (`status` + versioned `schedules`, every day `off`/`unknown`/`work` with optional start/end/break/duration/approximate), **known** (`set`/`not_set`/`unknown` per field), **exceptions** (no gym, more/less time, keep-all, push, time-boxed), **load** mode, **coach** (voice language, voice on/off, personality, AI toggles: Gemini, Food Vision, Save Food Photos, usage tracking, optional limits and thresholds — never an API key), body & nutrition, steps, hydration, leisure budget, safety bounds, notifications, appearance, difficulty, the editable `rules`, and `schemaVersion`. Normalised on read. |
 | `activities` | `id` | `category, tier, active` | The activity library (123 seeded): tier, recurrence, difficulty, duration, time of day, metric & mode, stats, tags, scalability. Editable in Admin. |
@@ -33,6 +33,7 @@ Types live in `src/types/*`.
 | `ledger` | `id` | `date, ts` | Every XP/coin/HP change with reason and source id, for the economy history and audits. |
 | `meals` | `id` | `date, ts` | Logged meals: name, items (name, grams, kcal, protein, carbs, fat), totals, optional small JPEG photo (≈320 px data URL, only when *Save Food Photos* is on), `source` (`manual`/`preset`/`photo`/`ai`), `estimate` (confidence, corrected, edited) for AI estimates. Deleting a meal removes its metric entries. |
 | `aiUsage` | `id` | `ts, type` | *(v3)* One row per Gemini request made by the app: timestamp, model, type (chat, food analyze/revise/explain, status test), input/output/total tokens as reported, ok, HTTP status, error kind, latency, image yes/no, Google quota details on 429. No content. Kept 45 days. |
+| `dayContexts` | `date` | | *(v4)* One row per game day with the facts the player gave: `firstOpenAt`, `wakeUpTime` + `wakeSource` (`confirmed` / `estimated` / `manual`), `wakeAskedAt` (NOT YET), `dayStartedAt` (START DAY), `work[]` sessions `{start, end, minutes, edited}` (a session belongs to the day it started on), `noWork`. States, priorities and time budget are computed, never stored. No location data. |
 | `aiChanges` | `id` | `ts` | *(v3)* Coach change log: tool, summary, source (gemini/rules), undo data (record snapshots or `uncomplete`), `undoneAt`. Last 60 kept. |
 
 Compound indexes serve the hot paths: `[date+kind]` (today's board by kind), `[activityId+date]` (per-activity history
@@ -59,8 +60,9 @@ and streaks), `[date+type]` / `[type+date]` (daily metric totals and trends).
 - `settingsRepository.get()` deep-fills missing settings fields from defaults (`normalizeSettings`), so adding a setting
   needs no migration.
 
-**Schema changes** use Dexie versioning. **Version 2** (current) adds the `meals` table and a `refId` index on
-`metrics`. Future changes add `this.version(3).stores({...}).upgrade(tx => …)` in `db.ts` and keep earlier versions intact.
+**Schema changes** use Dexie versioning. Version 2 added the `meals` table and a `refId` index on `metrics`, version 3
+the `aiUsage` and `aiChanges` tables, and **version 4** (current) the `dayContexts` table. Future changes add
+`this.version(5).stores({...}).upgrade(tx => …)` in `db.ts` and keep earlier versions intact.
 Dexie upgrades existing installs in place on the next launch.
 
 **Settings migrations** use `settings.schemaVersion` (currently 2, applied once at boot by `settingsRepository.migrate()`).

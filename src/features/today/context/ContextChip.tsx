@@ -13,7 +13,7 @@ export function ContextChip() {
   const info = STATE_INFO[view.state];
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="hit-44 mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-[13px] font-semibold shadow-card" aria-label={`Current context: ${info.label}. Why?`} data-tour="context">
+      <button type="button" onClick={() => setOpen(true)} className="hit-44 mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-[13px] font-semibold shadow-card" aria-label={`Current context: ${info.label}. Why?`} data-tour="context">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span key={view.state} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }} className="inline-flex items-center gap-1.5">
             <span aria-hidden>{info.icon}</span>

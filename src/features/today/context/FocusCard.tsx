@@ -47,7 +47,7 @@ export function FocusCard({ onStart, onOpen }: { onStart: (q: Quest) => void; on
   }
   if (!view.focus.length) return null;
   const [first, ...rest] = view.focus;
-  const title = view.state === 'POST_WORK' ? '🏠 Welcome back' : `${info.icon} ${info.greeting}`;
+  const title = `${info.icon} ${view.state === 'POST_WORK' ? info.label : info.greeting}`;
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="mt-3">
@@ -55,7 +55,7 @@ export function FocusCard({ onStart, onOpen }: { onStart: (q: Quest) => void; on
           <div className="min-w-0 truncate text-[12px] font-extrabold tracking-[0.16em] text-accent">RIGHT NOW · {title.toUpperCase()}</div>
           <span className="num shrink-0 text-[12px] text-muted">{formatDuration(view.availableMin)} left</span>
         </div>
-        <button type="button" onClick={() => onOpen(first.quest)} className="mt-2 flex w-full items-center gap-3 text-left">
+        <button type="button" onClick={() => onOpen(first.quest)} className="mt-2 flex min-h-11 w-full items-center gap-3 text-left">
           <span className="text-[30px]" aria-hidden>
             {first.quest.icon}
           </span>

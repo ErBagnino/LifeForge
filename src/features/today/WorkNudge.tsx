@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/primitives';
+import { clock } from '@/services/clock';
 import { setTemporaryWork } from '@/services/scheduleService';
 import { useGame } from '@/store/gameStore';
 import type { ISODate } from '@/types';
@@ -25,9 +26,12 @@ export function WorkNudge({ date, workStatus, dayIndex, onSetup }: { date: ISODa
   const act = useGame((s) => s.act);
   const status = useGame((s) => s.settings?.work.status);
   const [hidden, setHidden] = useState(() => dismissed(date));
-  const hour = new Date().getHours();
+  const context = useGame((s) => s.context);
+  const hour = new Date(clock.now()).getHours();
+  // Already answered by a logged work session (or "Not working today").
+  const answered = !!context && (!!context.openWork || context.ctx.work.length > 0 || !!context.ctx.noWork);
   const explicitUnknown = status === 'unknown';
-  const relevant = workStatus === 'unknown' && dayIndex >= 1 && hour >= 5 && hour < 14 && (!explicitUnknown || dayIndex % 3 === 1);
+  const relevant = !answered && workStatus === 'unknown' && dayIndex >= 1 && hour >= 5 && hour < 14 && (!explicitUnknown || dayIndex % 3 === 1);
 
   const dismiss = () => {
     try {

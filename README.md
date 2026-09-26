@@ -28,6 +28,7 @@ The name lives in a single constant (`src/config/app.ts` → `APP_CONFIG.name`),
 - [Environment variables](#environment-variables)
 - [AI Coach with Gemini (optional)](#ai-coach-with-gemini-optional)
 - [Push notifications](#push-notifications)
+- [Daily context & adaptive schedule](#daily-context--adaptive-schedule)
 - [Data, backup & privacy](#data-backup--privacy)
 - [Project structure](#project-structure)
 - [Hidden tools](#hidden-tools)
@@ -43,6 +44,7 @@ The name lives in a single constant (`src/config/app.ts` → `APP_CONFIG.name`),
 | **AI Coach (Gemini)** | A real agent with ~60 tools: it reads your game (quests, nutrition, workouts, schedule, rules…) and proposes changes: one-time vs recurring activities, goals, achievements, targets, workout edits, routines, schedule, game rules, resets. **Every change is validated and shown as a before → after preview**; nothing is written until you tap APPLY (APPLY ALL for several), and every applied change has **Undo**. Resets need a strong confirmation (typed `RESET EVERYTHING` for a full wipe). Quick actions (complete/skip) apply directly with Undo. Personalities: Gentle, Balanced, Direct (default), Hard. Photos in chat, voice input, a global **Ask LifeForge 🎙️** button. |
 | **Basic coach (no AI)** | Without Gemini (not set up, offline, quota reached) the on-device coach still configures schedule, availability, goals, targets, one-time/recurring activities and resets in Italian or English — with the same previews and Undo. |
 | **Today** | HUD (avatar, level, XP, coins, HP, energy), Today Score 0–100, **Day 1 starts small** (3–5 core objectives), Next Action card, collapsible sections (core, routines, important, optional, nutrition, stats), editable timeline, quick log, play-time timer, a "Working today?" prompt shown only when it would change the plan. |
+| **Daily context** | The Home knows *where you are in the day* — Wake-up, Morning, Work, Post-work, Training, Evening, Wind-down, Sleep, Weekend — from what you tell it, never from location. **"Did you just wake up?"** (YES / NOT YET, or confirm a learned typical time, or set it manually). **START WORK / END WORK** (START = leaving home, so the commute counts; the timer survives closing the app). **Work Mode** keeps the screen minimal and puts quests on hold (never failed); after END WORK you get **WORK COMPLETE → YOUR EVENING** with what still matters and how much time is left before bed. Every quest gets a **CRITICAL / IMPORTANT / NORMAL / OPTIONAL** priority from streaks, deadlines, energy and time left; low energy offers a reduced session. Postpone to **Later · After work · After dinner · Tomorrow · Weekend**. Reminders stay quiet during work and workouts. After 3–5 real observations it learns weekday vs weekend wake-up, workdays, meal and workout times, and only *proposes* changes (Settings → Daily Routine; Adaptive schedule on by default, resettable). |
 | **Nutrition** (tab) | Calories/macros/water against your targets, 16 quick-add foods with portions, 7-day charts. **SCAN FOOD**: take or choose a photo → Gemini returns a structured estimate (foods, approximate quantities, cooking method, confidence, assumptions) → it asks about what it can't see (oil, sauces) with quick buttons → correct it by text or voice ("it was turkey", "200 g rice") with a before → after diff and "why so many calories?" → **REVIEW MEAL** (edit anything; totals are recomputed locally) → **ADD TO TODAY**. Meals from photos are labelled **AI ESTIMATE**. Photos are not stored unless you turn on *Save Food Photos* (off by default). |
 | **Quests** | Core / important / side / daily challenge / weekly / boss / hidden. Complete, snooze (30 min · 1 h · tonight · tomorrow), reschedule, skip. Warns you when you keep postponing. Algorithmic side-quest generator (no AI API) that knows the time, your energy, workload and history. |
 | **Train** | Seeded 3-day plan (Mon Upper A · Wed Lower + Core · Fri Upper B, 60–120 s rest). 37 exercises with animated SVG illustrations and front/back muscle maps. Set logging (weight · reps · done · RPE 😎🙂😰💀 · note). A progression engine that *proposes* the next session and waits for your YES/NO, learns from failures, and never auto-applies. Walk → run cardio plan. |
@@ -298,6 +300,23 @@ POST {VITE_PUSH_ENDPOINT}/schedule      { "endpoint": string,
 function, a KV store, the [`web-push`](https://www.npmjs.com/package/web-push) library with your VAPID private key,
 and a cron that sends reminders whose `at` has passed. The service worker (`src/sw.ts`) already handles `push`
 and `notificationclick`, so a tap opens the right screen.
+
+## Daily context & adaptive schedule
+
+- **Facts only from taps.** Wake-up (YES / confirm / manual), START WORK / END WORK, "Not working today", workouts and
+  meals you log. **No GPS, no location, no background tracking.** Everything is stored on this device
+  (`dayContexts` table + the open work session in `meta`) and is never sent anywhere automatically.
+- **States are computed, not stored**: the current state, available minutes before bed, what fits and each quest's
+  priority are re-evaluated from the facts and the clock every time the Home refreshes (`domain/dailyContext.ts`).
+- **Work sessions** belong to the game day they started on (even across midnight) and are capped at 16 h if you forget
+  END WORK; fix times in Settings → Daily Routine. Stats show work history as context, not as a score.
+- **Opening the app late** is fine: the opening card adapts (morning / afternoon / evening) and "Welcome back" never
+  invents failures — missed days only affect the streak.
+- **Learning** needs at least 3 observations per pattern and separates weekdays from weekends. Suggested time changes
+  are YES / NO cards, never applied silently. *Reset learned schedule* forgets only patterns (progress and history stay).
+- **AI Coach**: Gemini receives a compact daily-context summary (state, wake-up, work status, minutes left, focus)
+  only as part of a chat you send, with `unknown` for anything not recorded, and is told never to invent it or plan
+  beyond the available time. The `getDailyContext` tool returns the same summary.
 
 ## Data, backup & privacy
 
