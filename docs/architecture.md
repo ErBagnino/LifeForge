@@ -152,6 +152,13 @@ clock + settings + quests + learned patterns ─► domain/dailyContext.ts evalu
 - **Privacy**: no geolocation API, no background tasks; the data never leaves the device except the summary inside
   a chat request the player sends.
 
+## Nutrition
+
+- `config/meals.ts`: the six meal types and the clock windows that pre-select one (`mealTypeAt`), plus `mealTypeOf` for meals saved before meal types existed.
+- `features/nutrition/MealBuilder.tsx` is the single ADD FOOD form (Nutrition, Home quick log, scan fallback); `metricsService.logMeal` writes the meal and one metric entry per macro (`refId` = meal id), `updateMeal` edits those entries in place and re-syncs quests, `deleteMeal` removes them.
+- Photo estimates: `ai/shared/food.ts` — `coerceEstimate` normalises the model reply into the schema bounds, `estimateRange` / `formatRange` / `portionRange` turn a single estimate into an honest range based on confidence. The server sends Gemini a schema without length/range limits (limits are enforced after the reply) and retries once with the schema in the prompt if Google rejects the request.
+- AI tools `logFood` / `logWater` are write tools (preview + APPLY).
+
 ## Coach (configuration assistant)
 ```
 text ─► domain/nlu.ts (normalize → days/scope/times/numbers → Intent[])
