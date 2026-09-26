@@ -54,7 +54,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'icons/*.png'],
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
       },
@@ -68,8 +68,8 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#0b0b10',
-        background_color: '#0b0b10',
+        theme_color: '#f4f4f7',
+        background_color: '#ffffff',
         categories: ['health', 'fitness', 'productivity', 'games', 'lifestyle'],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

@@ -1,26 +1,21 @@
-/** Source artwork for all app icons (anvil + spark on an ember gradient). */
+/**
+ * Source artwork for all app icons: "forged ascent" — a minimal anvil with three
+ * rising bars and a spark (forge + progression). White background, gray symbol.
+ * `scale` shrinks the symbol for maskable icons (safe zone), `rounded` adds corners
+ * for the favicon only (platforms mask the others themselves).
+ */
 export function iconSvg({ size = 512, rounded = true, scale = 1 } = {}) {
   const r = rounded ? 112 : 0;
   const t = (1 - scale) * 256;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff8a3d"/>
-      <stop offset="1" stop-color="#e8360f"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.62" cy="0.3" r="0.5">
-      <stop offset="0" stop-color="#fff3b0" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#fff3b0" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" rx="${r}" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="${r}" fill="url(#glow)"/>
+  <rect width="512" height="512" rx="${r}" fill="#ffffff"/>
+  ${rounded ? `<rect x="1" y="1" width="510" height="510" rx="${r - 1}" fill="none" stroke="#e4e4e8" stroke-width="2"/>` : ''}
   <g transform="translate(${t} ${t}) scale(${scale})">
-    <path d="M300 92 L316 146 L370 162 L316 178 L300 232 L284 178 L230 162 L284 146 Z" fill="#fff8d6"/>
-    <path d="M390 210 L398 232 L420 240 L398 248 L390 270 L382 248 L360 240 L382 232 Z" fill="#fff8d6" opacity="0.9"/>
-    <path d="M186 118 L191 134 L207 139 L191 144 L186 160 L181 144 L165 139 L181 134 Z" fill="#fff8d6" opacity="0.75"/>
-    <path d="M78 262 C120 262 150 256 170 252 L402 252 C412 252 420 260 420 270 L420 300 C420 310 412 316 402 318 C356 324 336 336 330 356 L338 384 L372 384 C381 384 388 391 388 400 L388 414 C388 423 381 430 372 430 L140 430 C131 430 124 423 124 414 L124 400 C124 391 131 384 140 384 L174 384 L182 356 C176 338 160 326 132 318 C104 310 86 292 78 262 Z" fill="#ffffff"/>
-    <rect x="170" y="252" width="232" height="14" rx="7" fill="#ffd9c7"/>
+    <rect x="170" y="236" width="46" height="52" rx="12" fill="#b4b6bc"/>
+    <rect x="233" y="188" width="46" height="100" rx="12" fill="#95979e"/>
+    <rect x="296" y="136" width="46" height="152" rx="12" fill="#74767d"/>
+    <path d="M319 72 L327 94 L349 102 L327 110 L319 132 L311 110 L289 102 L311 94 Z" fill="#5c5e65"/>
+    <path d="M104 306 L384 306 C397 306 408 317 408 330 L408 334 C408 346 399 355 387 356 L330 362 L312 392 L346 392 C356 392 364 400 364 410 L364 418 C364 428 356 436 346 436 L166 436 C156 436 148 428 148 418 L148 410 C148 400 156 392 166 392 L200 392 L182 362 L150 356 C124 351 108 332 104 306 Z" fill="#5c5e65"/>
   </g>
 </svg>`;
 }

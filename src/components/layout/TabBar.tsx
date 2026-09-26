@@ -9,11 +9,11 @@ import { Icon, type IconName } from '../ui/Icon';
 import { cx } from '../ui/primitives';
 
 const TABS: { to: string; label: string; icon: IconName }[] = [
-  { to: '/', label: 'Today', icon: 'today' },
+  { to: '/', label: 'Home', icon: 'today' },
   { to: '/quests', label: 'Quests', icon: 'quests' },
   { to: '/train', label: 'Train', icon: 'train' },
+  { to: '/nutrition', label: 'Nutrition', icon: 'food' },
   { to: '/world', label: 'World', icon: 'world' },
-  { to: '/stats', label: 'Stats', icon: 'stats' },
 ];
 
 export function TabBar() {
@@ -35,6 +35,7 @@ export function TabBar() {
               onClick={() => haptics.tap()}
               className={cx('relative flex flex-1 flex-col items-center justify-center gap-0.5 pt-1 text-[10.5px] font-semibold', active ? 'text-accent' : 'text-faint')}
               aria-current={active ? 'page' : undefined}
+              data-tour={`tab-${t.label.toLowerCase()}`}
             >
               <motion.span animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }} className="relative">
                 <Icon name={t.icon} size={25} strokeWidth={active ? 2.3 : 1.9} />

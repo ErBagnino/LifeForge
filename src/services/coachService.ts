@@ -273,8 +273,12 @@ export async function sendMessage(state: ChatState, input: { text: string; value
     } else if (intent?.kind === 'tools') {
       coach.text = intent.text;
       coach.quick = undefined;
-      coach.actions = await ruleCards(intent.calls);
-      if (coach.actions.every((a) => a.status === 'failed')) coach.text = coach.actions.map((a) => a.result).join(' ');
+      const cards = await ruleCards(intent.calls);
+      const failed = cards.filter((a) => a.status === 'failed');
+      coach.actions = cards.filter((a) => a.status !== 'failed');
+      // A call that can't be previewed (already set, out of bounds…) is explained in text, not as a card.
+      if (failed.length) coach.text = coach.actions.length ? `${intent.text} (${failed.map((a) => a.result).join(' ')})` : failed.map((a) => a.result).join(' ');
+      if (!coach.actions.length) coach.actions = undefined;
     }
   }
 

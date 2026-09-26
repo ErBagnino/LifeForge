@@ -6,6 +6,7 @@ import { APP_CONFIG } from '@/config/app';
 import { profileFields } from '@/domain/profile';
 import { saveSettings } from '@/services/adminService';
 import { clock } from '@/services/clock';
+import { startTutorial } from '@/features/tutorial/Tutorial';
 import { useAi } from '@/store/aiStore';
 import { useGame } from '@/store/gameStore';
 
@@ -36,6 +37,7 @@ export default function SettingsScreen() {
         <Row icon="🔔" iconBg="#ffe3d3" title="Notifications" subtitle={settings.notifications.enabled ? 'On' : 'Off'} onClick={go('notifications')} />
         <Row icon="✨" iconBg="#ececf0" title="AI" subtitle={settings.coach.ai.enabled ? `Gemini · ${aiLabel} · usage` : 'Off · basic coach'} onClick={go('ai')} />
         <Row icon="💾" iconBg="#e3f4ff" title="Data" subtitle="Export / import JSON backup" onClick={go('data')} />
+        <Row icon="🧭" iconBg="#d6f5e6" title="Help" subtitle="Replay the interactive tour" onClick={() => startTutorial()} />
         <Row icon="🛠️" iconBg="#ececf0" title="Admin" subtitle="Activities, rules, economy, AI import" onClick={() => navigate('/admin')} />
         {settings.devMode && <Row icon="🧪" title="Developer toolbox" onClick={() => navigate('/dev')} />}
       </List>

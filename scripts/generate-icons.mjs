@@ -22,6 +22,7 @@ const targets = [
   { file: 'icons/icon-512.png', size: 512, rounded: false, scale: 1 },
   { file: 'icons/icon-maskable-512.png', size: 512, rounded: false, scale: 0.72 },
   { file: 'apple-touch-icon.png', size: 180, rounded: false, scale: 0.94 },
+  { file: 'favicon-32.png', size: 32, rounded: true, scale: 1.12 },
 ];
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });

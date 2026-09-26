@@ -95,7 +95,7 @@ export function MealBuilder({ initial = [], photo, source, name: initialName, on
       <details className="mt-4 rounded-2xl bg-surface p-3 shadow-card">
         <summary className="flex min-h-11 cursor-pointer items-center text-[14px] font-semibold">Something else (enter values)</summary>
         <div className="mt-2 space-y-2">
-          <TextInput value={custom.name} onChange={(v) => setCustom({ ...custom, name: v })} placeholder="Food name" aria-label="Food name" />
+          <TextInput value={custom.name} onChange={(v) => setCustom({ ...custom, name: v })} placeholder="Food name" aria-label="Food name" voice />
           <div className="grid grid-cols-2 gap-2">
             {(['kcal', 'protein', 'carbs', 'fat'] as const).map((k) => (
               <Field key={k} label={k === 'kcal' ? 'Calories (kcal)' : `${k[0].toUpperCase()}${k.slice(1)} (g)`}>

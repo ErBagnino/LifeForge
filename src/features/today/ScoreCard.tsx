@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useState } from 'react';
 import { Ring, ProgressBar } from '@/components/ui/progress';
 import { Card } from '@/components/ui/primitives';
@@ -15,7 +16,7 @@ export function ScoreCard() {
   const coreLeft = (log?.core.total ?? 0) - (log?.core.done ?? 0);
 
   return (
-    <Card className="mt-4" onClick={() => setOpen((v) => !v)} aria-label={`Today score ${score} of 100. Tap for breakdown`}>
+    <Card className="mt-4" data-tour="score" onClick={() => setOpen((v) => !v)} aria-label={`Today score ${score} of 100. Tap for breakdown`}>
       <div className="flex items-center gap-4">
         <Ring value={score / 100} size={108} stroke={11} color={score >= threshold ? 'var(--lf-success)' : 'var(--lf-accent)'} label={`Score ${score}`}>
           <span className="num text-[34px] leading-none font-extrabold">{score}</span>
@@ -24,6 +25,7 @@ export function ScoreCard() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-extrabold tracking-wider text-muted">TODAY</span>
+            <InfoTip k="score" />
             <span className="num rounded-lg px-1.5 text-[13px] font-black text-white" style={{ background: GRADE_COLOR[grade] }}>
               {grade}
             </span>

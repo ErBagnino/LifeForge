@@ -10,10 +10,12 @@ import { Icon } from '../ui/Icon';
 import { AnimatedNumber, ProgressBar } from '../ui/progress';
 import { Sheet } from '../ui/Sheet';
 import { Row, List } from '../ui/forms';
+import { InfoTip, type InfoKey } from '../ui/InfoTip';
+import { openAsk } from './AskSheet';
 
-function Meter({ icon, value, max, color, label, id }: { icon: string; value: number; max: number; color: string; label: string; id?: string }) {
+function Meter({ icon, value, max, color, label, id, tip }: { icon: string; value: number; max: number; color: string; label: string; id?: string; tip?: InfoKey }) {
   return (
-    <div id={id} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2.5 py-1.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
+    <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2.5 py-1.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
       <span aria-hidden className="text-[14px]">
         {icon}
       </span>
@@ -23,6 +25,7 @@ function Meter({ icon, value, max, color, label, id }: { icon: string; value: nu
         </div>
         <ProgressBar value={value / max} color={color} height={4} className="mt-1" />
       </div>
+      {tip && <InfoTip k={tip} />}
     </div>
   );
 }
@@ -40,7 +43,7 @@ export function GameHud() {
   return (
     <div className="px-safe pt-[calc(var(--safe-top)+10px)]">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => setMenu(true)} aria-label="Open profile menu" className="relative">
+        <button type="button" onClick={() => setMenu(true)} aria-label="Open profile menu" data-tour="profile" className="relative">
           <Avatar config={player.avatar} size={48} ring={player.recoveryMode ? 'var(--lf-hp)' : 'var(--lf-accent)'} />
         </button>
         <div className="min-w-0 flex-1" id="hud-xp">
@@ -57,17 +60,17 @@ export function GameHud() {
           </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
-          <button type="button" onClick={() => navigate('/coach')} aria-label="Coach" className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/12 text-accent">
-            <Icon name="chat" size={20} />
+          <button type="button" onClick={() => openAsk()} aria-label="Ask LifeForge" data-tour="ask" className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/12 text-accent">
+            <Icon name="mic" size={20} />
           </button>
-          <button type="button" onClick={() => navigate('/search')} aria-label="Search" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2">
-            <Icon name="search" size={19} />
+          <button type="button" onClick={() => navigate('/stats')} aria-label="Stats" data-tour="stats" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2">
+            <Icon name="stats" size={19} />
           </button>
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" />
-        <Meter icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" />
+        <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" tip="hp" />
+        <Meter icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" tip="energy" />
         <div className="flex items-center gap-1 rounded-2xl bg-surface-2 px-2.5" aria-label={`Streak ${player.streak.current} days`}>
           <Flame size={16} dim={player.streak.current === 0} />
           <span className="num text-[15px] font-bold">{player.streak.current}</span>
@@ -93,6 +96,8 @@ export function GameHud() {
           <Row icon="🏅" title="Achievements" onClick={() => { setMenu(false); navigate('/achievements'); }} />
           <Row icon="🎨" title="Customize avatar" onClick={() => { setMenu(false); navigate('/world/avatar'); }} />
           <Row icon="🎮" title="Play time" subtitle="Daily budget timer" onClick={() => { setMenu(false); navigate('/play'); }} />
+          <Row icon="💬" title="Coach chat" subtitle="Gemini AI or basic coach" onClick={() => { setMenu(false); navigate('/coach'); }} />
+          <Row icon="📊" title="Stats" onClick={() => { setMenu(false); navigate('/stats'); }} />
           <Row icon="🔍" title="Search" onClick={() => { setMenu(false); navigate('/search'); }} />
         </List>
         <List>

@@ -111,7 +111,7 @@ export default function ActivityEditor() {
             <TextInput value={a.icon} onChange={(v) => set({ icon: v.slice(0, 4) })} aria-label="Icon" />
           </Field>
           <Field label="Name" hint="Use {pet} for your pet's name">
-            <TextInput value={a.name} onChange={(v) => set({ name: v })} aria-label="Name" maxLength={60} />
+            <TextInput value={a.name} onChange={(v) => set({ name: v })} aria-label="Name" maxLength={60} voice />
           </Field>
         </div>
         <Field label="Description">

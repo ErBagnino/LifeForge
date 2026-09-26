@@ -242,7 +242,10 @@ export default function CoachScreen() {
   const usage = useAi((s) => s.usage);
   const checkAi = useAi((s) => s.check);
   const [chat, setChat] = useState<ChatState | null>(null);
-  const [text, setText] = useState(() => (location.state as { draft?: string } | null)?.draft ?? '');
+  const [text, setText] = useState(() => {
+    const st = location.state as { draft?: string; send?: boolean } | null;
+    return st?.send ? '' : (st?.draft ?? '');
+  });
   const [photo, setPhoto] = useState<{ mimeType: 'image/jpeg'; data: string; dataUrl: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -256,6 +259,15 @@ export default function CoachScreen() {
     void checkAi();
     return () => cancelTurn();
   }, [checkAi]);
+  const autoSent = useRef(false);
+  useEffect(() => {
+    const st = location.state as { draft?: string; send?: boolean } | null;
+    if (!chat || autoSent.current || !st?.send || !st.draft) return;
+    autoSent.current = true;
+    navigate('/coach', { replace: true, state: null });
+    send(st.draft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat]);
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [chat?.messages.length, busy]);
@@ -344,7 +356,7 @@ export default function CoachScreen() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[14px] font-black tracking-[0.14em]">LIFEFORGE COACH</div>
-            <button type="button" onClick={() => navigate('/settings/ai#usage')} className="flex max-w-full items-center gap-1 truncate text-[11px] text-muted" aria-label={`AI status: ${badge.label}. Open Gemini usage`}>
+            <button type="button" onClick={() => navigate('/settings/ai#usage')} className="hit-44 flex max-w-full items-center gap-1 truncate text-[11px] text-muted" aria-label={`AI status: ${badge.label}. Open Gemini usage`}>
               <span aria-hidden>{badge.icon}</span>
               <span className="truncate">{connected || badge.tone === 'bad' ? badge.label : ui === 'connecting' ? 'Connecting…' : 'Basic coach · preview first'}</span>
             </button>

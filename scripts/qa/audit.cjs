@@ -12,7 +12,7 @@
 const { chromium, devices } = require('playwright');
 const fs = require('fs');
 const W = Number(process.env.W || 393), H = Number(process.env.H || 852);
-const ROUTES = (process.env.ROUTES || '/,/quests,/quests/routines,/train,/train/exercises,/train/exercise/chest_press,/train/plan,/train/cardio,/world,/world/shop,/world/avatar,/stats,/stats/calendar,/stats/advanced,/stats/records,/review/day,/review/week,/profile,/achievements,/play,/search,/coach,/nutrition,/nutrition/scan,/settings,/settings/profile,/settings/appearance,/settings/game,/settings/schedule,/settings/targets,/settings/safety,/settings/notifications,/settings/data,/settings/coach,/admin,/admin/activities,/admin/activities/drink_water,/admin/rules,/admin/economy,/admin/ai,/admin/routines,/train/workout').split(',');
+const ROUTES = (process.env.ROUTES || '/,/quests,/quests/routines,/train,/train/exercises,/train/exercise/chest_press,/train/plan,/train/cardio,/world,/world/shop,/world/avatar,/stats,/stats/calendar,/stats/advanced,/stats/records,/review/day,/review/week,/profile,/achievements,/play,/search,/coach,/nutrition,/nutrition/scan,/settings,/settings/profile,/settings/appearance,/settings/game,/settings/schedule,/settings/targets,/settings/safety,/settings/notifications,/settings/data,/settings/ai,/admin,/admin/activities,/admin/activities/drink_water,/admin/rules,/admin/economy,/admin/ai,/admin/routines,/train/workout').split(',');
 (async () => {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: W, height: H }, colorScheme: process.env.DARK ? 'dark' : 'light' });

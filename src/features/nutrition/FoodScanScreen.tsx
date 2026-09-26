@@ -478,7 +478,7 @@ function PrivacyNote({ aiOn, savePhotos, reason, onSettings }: { aiOn: boolean; 
         reason
       )}{' '}
       Save Food Photos: <b>{savePhotos ? 'ON (small thumbnail on this device)' : 'OFF'}</b>.{' '}
-      <button type="button" className="font-semibold text-accent" onClick={onSettings}>
+      <button type="button" className="hit-44 font-semibold text-accent" onClick={onSettings}>
         Settings
       </button>
     </div>

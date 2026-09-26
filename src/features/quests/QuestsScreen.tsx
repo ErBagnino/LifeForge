@@ -98,7 +98,7 @@ function TodayTab() {
               <TextInput value={draft.icon} onChange={(v) => setDraft({ ...draft, icon: v.slice(0, 4) })} aria-label="Icon" />
             </Field>
             <Field label="What will you do?">
-              <TextInput value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="Fix the bike" aria-label="Quest title" autoFocus />
+              <TextInput value={draft.title} onChange={(v) => setDraft({ ...draft, title: v })} placeholder="Fix the bike" aria-label="Quest title" autoFocus voice />
             </Field>
           </div>
           <Field label="Category">
@@ -203,7 +203,7 @@ function LibraryTab() {
   );
   return (
     <div className="mt-3">
-      <TextInput value={query} onChange={setQuery} placeholder="Search activities…" aria-label="Search activities" type="search" />
+      <TextInput value={query} onChange={setQuery} placeholder="Search activities…" aria-label="Search activities" type="search" voice />
       <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1">
         {(['all', ...CATEGORIES] as const).map((c) => (
           <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-11 shrink-0 rounded-full px-3.5 text-[13px] font-semibold', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>

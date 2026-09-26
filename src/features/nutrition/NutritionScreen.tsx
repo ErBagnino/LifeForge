@@ -40,7 +40,11 @@ export default function NutritionScreen() {
   ];
 
   return (
-    <Screen back title="Nutrition" subtitle="Targets are your settings, not rules.">
+    <Screen hud>
+      <header className="flex items-end justify-between gap-2 pt-4 pb-1">
+        <h1 className="text-[28px] leading-tight font-extrabold tracking-tight">Nutrition</h1>
+        <span className="pb-1 text-[12px] text-muted">Targets are settings, not rules.</span>
+      </header>
       <Card className="mt-3">
         <div className="flex items-center gap-4">
           <Ring value={kcal / n.calories} size={112} stroke={11} color={inRange ? 'var(--lf-success)' : 'var(--lf-accent)'} label={`Calories ${Math.round(kcal)} of ${n.calories}`}>

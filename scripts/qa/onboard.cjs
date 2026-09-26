@@ -31,4 +31,11 @@ module.exports = async function onboard(page, { name = 'Ale', shots, tag = '' } 
   await shot('8-ready');
   await page.getByRole('button', { name: 'Start my first quest' }).click();
   await page.waitForTimeout(2500);
+  // The interactive tour starts after onboarding: capture it, then skip so it doesn't cover the audit.
+  const skip = page.getByRole('button', { name: 'Skip', exact: true });
+  if (await skip.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await shot('9-tour');
+    await skip.click();
+    await page.waitForTimeout(400);
+  }
 };

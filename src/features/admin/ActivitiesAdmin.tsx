@@ -33,7 +33,7 @@ export default function ActivitiesAdmin() {
   );
   return (
     <Screen back title="Activities" subtitle={`${data?.length ?? 0} total`} right={<Button size="sm" icon="plus" onClick={() => navigate('/admin/activities/new')}>New</Button>}>
-      <TextInput value={q} onChange={setQ} placeholder="Search…" type="search" aria-label="Search activities" className="mt-2" />
+      <TextInput value={q} onChange={setQ} placeholder="Search…" type="search" aria-label="Search activities" className="mt-2" voice />
       <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4">
         {(['all', 'core', 'important', 'optional', 'paused', 'custom'] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTier(t)} className={cx('h-11 shrink-0 rounded-full px-3.5 text-[13px] font-semibold capitalize', tier === t ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>

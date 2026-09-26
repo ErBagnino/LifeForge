@@ -1,3 +1,4 @@
+import { TextInput } from '@/components/ui/forms';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -226,6 +227,7 @@ export default function WorkoutLogger() {
         <Button block variant="secondary" icon="plus" onClick={() => setPicker(true)}>
           Add exercise
         </Button>
+        <TextInput voice value={session.notes ?? ''} onChange={(v) => update({ ...session, notes: v.slice(0, 300) || undefined })} placeholder="Session notes (how it felt, pain, gym busy…)" aria-label="Session notes" />
       </div>
 
       <AnimatePresence>

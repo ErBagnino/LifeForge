@@ -24,7 +24,7 @@ export default function SearchScreen() {
   for (const r of data ?? []) grouped.set(r.kind, [...(grouped.get(r.kind) ?? []), r]);
   return (
     <Screen back title="Search">
-      <TextInput value={q} onChange={setQ} placeholder="Activities, exercises, achievements, rooms…" type="search" autoFocus aria-label="Search" className="mt-2" />
+      <TextInput value={q} onChange={setQ} placeholder="Activities, exercises, achievements, rooms…" type="search" autoFocus aria-label="Search" className="mt-2" voice />
       {deferred.length < 2 && <p className="mt-4 px-1 text-[14px] text-muted">Type at least 2 letters. Try “water”, “chest”, “streak”, “gym”…</p>}
       {deferred.length >= 2 && !data?.length && (
         <div className="mt-4">

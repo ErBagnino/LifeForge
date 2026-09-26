@@ -136,10 +136,46 @@ text ─► domain/nlu.ts (normalize → days/scope/times/numbers → Intent[])
   ambiguous scope ("lavoro 9–18" with no date) triggers a question with quick replies.
 - Proposals are data (`ConfigChange` union). Nothing is written until APPLY. "sì" confirms, and "no" / "non mi va" /
   "lascia tutto com'è" dismiss. Chat history lives in `meta.coachChat`.
-- Optional fallback: `services/ai/claude.ts` makes one forced tool call to the Messages API with the player's own key (stored
-  in localStorage, excluded from backups). The output is validated with Zod against the same `ConfigChange` schema
-  and still shown as a proposal. Food photos use the same client with a `log_meal` tool. Models are listed from the API,
-  never hard-coded.
+- The basic coach also recognises tool intents (`domain/ruleIntents.ts`: nutrition/water targets, one-time vs
+  recurring activities, "achievement for N workouts", "ricominciare da zero" → clarification). They become the same
+  action cards the Gemini agent uses (below), so validation, previews and Undo are identical with or without AI.
+
+## AI agent (Gemini)
+
+```
+browser                                   Vercel Functions (Node)                Google
+services/ai/orchestrator.ts ──fetch──►  api/ai.ts → server/ai/handlers.ts ──►  Gemini API
+  context.ts (compact JSON)              zod-validate · size-limit · map errors   (GEMINI_API_KEY
+  tools/registry.ts                       declare TOOL_DEFS as functions            server-only)
+    validate (zod) → prepare (preview) → [user APPLY] → execute (services/GameTx) → result
+  changeLog.ts (Dexie hooks → snapshots → Undo)
+  usageService.ts (metadata-only request log)
+```
+
+- **Stateless server, client-side loop.** `/api/ai` performs one Gemini step and returns the model content and its
+  function calls. The orchestrator runs read tools immediately, applies low-risk tools (complete/skip) with Undo,
+  and pauses on write/destructive tools: the cards are stored with the paused turn (`ChatState.awaiting`) and the
+  turn resumes when every card is applied or cancelled. Function responses (`{success, message, data}` or
+  `{success:false, cancelled:true}`) are sent back so the final reply can't claim changes that didn't happen.
+  Max 6 steps per turn; only a short text transcript is kept between turns; photos are never persisted.
+- **One catalogue** (`src/ai/shared/tools.ts`): name, permission (`read`/`low`/`write`/`destructive`), description
+  and zod schema. The server turns it into Gemini `functionDeclarations` (JSON Schema); the app validates every call
+  with the same schema, then `tools/writeTools.ts` checks it against real data (ids exist, dates not in the past,
+  safety bounds, gradual target changes, weight cap) and builds the before → after preview. Execution goes through the
+  existing services — the AI never touches IndexedDB.
+- **Undo.** While a tool runs, Dexie `creating/updating/deleting` hooks capture the previous value of every tracked
+  record (settings, activities, quests, plans, achievements, meals…). Undo restores them and re-settles the day; a
+  failed multi-step tool is rolled back the same way. Rewards are never restored by snapshot: quest completions are
+  undone through `uncompleteQuest`. Resets are not undoable and need confirmation (`RESET EVERYTHING` typed for a wipe).
+- **Food vision** (`services/foodService.ts` → `/api/food`): images are compressed to ≤ 1280 px / ≈ 0.9 MB JPEG,
+  Gemini answers with `responseJsonSchema` = `FoodEstimateSchema`; the server validates it and recomputes totals.
+  Corrections send the estimate JSON + the user's text (not the photo). Everything is cached per image/correction.
+- **Errors** are mapped server-side (`not_configured`, `invalid_key`, `quota`, `model`, `image`, `bad_request`,
+  `server`); quota errors carry Google's own details (limit type, value, retry delay). Any error falls back to the basic
+  coach; quota errors show GEMINI LIMIT REACHED with USE BASIC COACH / VIEW USAGE.
+- **Usage** (`domain/aiUsage.ts`): the app logs metadata per request and estimates periods, RPM/TPM/RPD against
+  limits the player copied from AI Studio (never invented), and warning levels with configurable thresholds.
+- **Dev:** `vite.config.ts` mounts the same handlers under `/api/*` during `npm run dev` (reads `.env.local`).
 
 ## Notifications
 `services/notifications/NotificationService.ts` exposes providers (`inapp`, `browser`, `webpush`, reserved `native`).
