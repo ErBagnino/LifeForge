@@ -13,6 +13,7 @@ import { evaluateRules } from '@/domain/rulesEngine';
 import {
   activityRepository,
   aggregateMetrics,
+  getDb,
   metaRepository,
   questRepository,
   routineRepository,
@@ -296,9 +297,13 @@ export async function closeDay(date: ISODate): Promise<ServiceResult> {
     const routines = await routineRepository.all();
     const hadQuests = quests.length > 0;
 
-    // Play-time budget quests resolve at day end: under budget = win.
+    // Play-time budget quests resolve at day end: under budget = win — but only on a day the
+    // player actually used the app. Untracked play time on a day nobody opened LifeForge is not
+    // proof of staying under budget, so it is neither a win nor a failure.
+    const [dayCtx, dayMetrics] = await Promise.all([getDb().dayContexts.get(date), statsRepository.metricsByDate(date)]);
+    const active = !!dayCtx?.firstOpenAt || dayMetrics.length > 0 || quests.some((q) => q.status === 'completed' || q.status === 'skipped');
     for (const q of quests) {
-      if (q.metricMode === 'atMost' && q.status === 'pending' && q.target !== undefined && q.progress <= q.target) {
+      if (active && q.metricMode === 'atMost' && q.status === 'pending' && q.target !== undefined && q.progress <= q.target) {
         const done = await applyCompletion(tx, q);
         Object.assign(q, done);
       }

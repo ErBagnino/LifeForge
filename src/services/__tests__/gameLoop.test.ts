@@ -11,6 +11,7 @@ import { exportData, importData, validateImport } from '../exportService';
 import { finishSession, startSession, saveSession, decideSuggestion } from '../workoutService';
 import { parseAiResponse, buildAiPrompt } from '../aiImportService';
 import { clock } from '../clock';
+import { shiftDate } from '@/utils/date';
 import { runReset } from '../resetService';
 import type { Rpe } from '@/types';
 
@@ -162,6 +163,47 @@ describe('game loop (IndexedDB)', () => {
     expect(today.day.length).toBeGreaterThan(5);
     expect(player.level).toBeGreaterThanOrEqual(2);
     expect(today.day.some((q) => q.kind === 'side')).toBe(true);
+  });
+
+  it('a simulated week stays consistent: XP/coins match the ledger, no double rewards, every day closed once', async () => {
+    const start = clock.today();
+    const s = (await settingsRepository.get())!;
+    for (let d = 0; d < 7; d++) {
+      const { day } = await loadDay(clock.today());
+      if (d !== 3) {
+        // Day 3 is fully missed: nothing is done, nothing is invented.
+        const todo = day.filter((q) => q.status === 'pending' && !q.metric && !q.goal);
+        for (const q of todo.slice(0, d % 2 ? todo.length : Math.ceil(todo.length / 2))) await completeQuest(q.id);
+        if (todo[0]) {
+          const xp = (await playerRepository.get())!.xp;
+          await completeQuest(todo[0].id); // double tap
+          expect((await playerRepository.get())!.xp).toBe(xp);
+        }
+        await logMeal({ name: 'Lunch', mealType: 'lunch', items: [{ name: 'Rice', kcal: 600, protein: 30, carbs: 80, fat: 10 }], kcal: 600, protein: 30, carbs: 80, fat: 10, source: 'manual' });
+        await logMetric('water', s.hydration.targetMl / 2);
+        const later = day.find((q) => q.status === 'pending' && q.kind === 'scheduled' && q.tier !== 'core');
+        if (later) await snoozeQuest(later.id, clock.now() + 3600_000);
+      }
+      clock.setOffset(clock.getOffset() + 86400000);
+      await ensureToday();
+    }
+    const end = clock.today();
+    const logs = await statsRepository.logs(start, end);
+    const past = logs.filter((l) => l.date < end);
+    expect(new Set(logs.map((l) => l.date)).size).toBe(logs.length); // one log per day
+    expect(past).toHaveLength(7);
+    expect(past.every((l) => l.closed)).toBe(true);
+    const missed = past.find((l) => l.date === shiftDate(start, 3))!;
+    expect(missed.metrics.calories ?? 0).toBe(0);
+    const missedDone = (await questRepository.byDate(missed.date)).filter((q) => q.status === 'completed').map((q) => `${q.title}|${q.metric ?? ''}|${q.tier}`);
+    expect(missedDone).toEqual([]);
+    const ledger = await statsRepository.ledger(shiftDate(start, -30), end);
+    const player = (await playerRepository.get())!;
+    const sum = (t: string) => ledger.filter((l) => l.type === t).reduce((a, l) => a + l.amount, 0);
+    expect(player.xp).toBe(Math.max(0, sum('xp')));
+    expect(player.coins).toBe(Math.max(0, sum('coins')));
+    expect(player.streak.current).toBeLessThanOrEqual(3); // broken by the missed day
+    expect(player.streak.longest).toBeGreaterThanOrEqual(player.streak.current);
   });
 
   it('rest day removes training quests', async () => {
