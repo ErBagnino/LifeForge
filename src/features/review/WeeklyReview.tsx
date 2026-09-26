@@ -25,10 +25,13 @@ export default function WeeklyReview() {
   if (!data) return null;
   const delta = data.avgScore !== null && data.prevAvgScore !== null ? data.avgScore - data.prevAvgScore : null;
   const recs: string[] = [];
-  if (data.coreRate !== null && data.coreRate < 0.7) recs.push('Protect the core: fewer side quests until core completion is back above 70%.');
-  if (data.weakest) recs.push(`Give ${CATEGORY_INFO[data.weakest].label.toLowerCase()} one small win early in the day.`);
-  if (data.workouts < 2) recs.push('Schedule workouts at your learned best time — the reminder will follow.');
-  if ((data.avgSteps ?? 0) > 0 && (data.avgSteps ?? 0) < 5000) recs.push('Add one 10-minute walk after lunch or dinner.');
+  // Advice needs real days behind it: at least two finished days this week.
+  const fullDays = data.logs.filter((l) => l.closed).length;
+  if (fullDays < 2) recs.push('Recommendations appear after a couple of full days — just play the week.');
+  else if (data.coreRate !== null && data.coreRate < 0.7) recs.push('Protect the core: fewer side quests until core completion is back above 70%.');
+  if (fullDays >= 2 && data.weakest) recs.push(`Give ${CATEGORY_INFO[data.weakest].label.toLowerCase()} one small win early in the day.`);
+  if (fullDays >= 2 && data.workouts < 2) recs.push('Schedule workouts at your learned best time — the reminder will follow.');
+  if (fullDays >= 2 && (data.avgSteps ?? 0) > 0 && (data.avgSteps ?? 0) < 5000) recs.push('Add one 10-minute walk after lunch or dinner.');
   if (!recs.length) recs.push('Keep the rhythm. Small upgrades, same consistency.');
 
   return (

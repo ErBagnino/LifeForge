@@ -28,6 +28,8 @@ import { dateRange, daysBetween, hmToMinutes, isWeekend, minutesToHm, shiftDate,
 import { mean } from '@/utils/math';
 import { clock } from './clock';
 import { planFor, trainingAvailable } from './game/dayPlan';
+import { adventureDay } from './game/load';
+import { rampLimits } from '@/domain/capacity';
 import { exerciseHistory } from './workoutService';
 
 export interface TomorrowForecast {
@@ -58,6 +60,14 @@ export async function tomorrowForecast(): Promise<TomorrowForecast | undefined> 
       daysLeftInWeek: daysLeftInWeek(date),
     });
   });
+  // Same first-week ramp as the real board, so the forecast never promises more than will appear.
+  const player = await playerRepository.get();
+  const ramp = player ? rampLimits(await adventureDay(date, player, settings)) : undefined;
+  if (ramp) {
+    const byImportance = (tier: string) => due.filter((a) => a.tier === tier).sort((a, b) => b.importance - a.importance);
+    const kept = [...byImportance('core').slice(0, ramp.core), ...byImportance('important').slice(0, ramp.important), ...(ramp.routines ? byImportance('optional') : [])];
+    due.splice(0, due.length, ...kept);
+  }
   const workoutPlan = await workoutRepository.activePlan();
   const template = plan.dayType !== 'rest' ? workoutPlan?.templates.find((t) => t.weekday === weekday(date)) : undefined;
   const workload = computeWorkload({
@@ -104,7 +114,11 @@ function categoryStats(quests: Quest[]): { strongest?: ActivityCategory; weakest
   }
   const rated = Object.entries(by).filter(([, v]) => v.total >= 2).map(([k, v]) => ({ k: k as ActivityCategory, r: v.done / v.total, n: v.total }));
   rated.sort((a, b) => b.r - a.r || b.n - a.n);
-  return { strongest: rated[0]?.k, weakest: rated.length > 1 ? rated[rated.length - 1].k : undefined, byCategory: by };
+  // Only name a strongest / weakest area when the numbers actually differ (0/2 everywhere says nothing).
+  const best = rated[0];
+  const worst = rated.length > 1 ? rated[rated.length - 1] : undefined;
+  const differs = !!best && !!worst && best.r > worst.r;
+  return { strongest: best && best.r > 0 && (differs || rated.length === 1) ? best.k : undefined, weakest: differs ? worst!.k : undefined, byCategory: by };
 }
 
 export interface WeeklyReview {

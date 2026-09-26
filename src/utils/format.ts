@@ -41,6 +41,14 @@ export function capitalize(s: string): string {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
+/** "calorieTolerancePct" → "Calorie tolerance %", "max_per_day" → "Max per day". */
 export function labelize(key: string): string {
-  return capitalize(key.replace(/_/g, ' '));
+  const words = key
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\bPct\b/g, '%')
+    .toLowerCase()
+    .replace(/\bxp\b/g, 'XP')
+    .replace(/\bhp\b/g, 'HP');
+  return capitalize(words.trim());
 }

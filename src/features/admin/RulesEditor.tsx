@@ -107,9 +107,9 @@ export default function RulesEditor() {
             <div className="mt-2 rounded-xl bg-surface-2 p-2 font-mono text-[11px] text-muted">{describeRule(r)}</div>
             <div className="mt-2 space-y-1.5">
               {r.conditions.map((c, ci) => (
-                <div key={ci} className="grid grid-cols-[1fr_64px_80px] gap-1.5">
+                <div key={ci} className="grid grid-cols-[1fr_78px_76px] gap-1.5">
                   <Select value={c.fact} onChange={(v) => setCondition(ri, ci, { ...c, fact: v })} options={Object.entries(FACT_CATALOG).map(([k, f]) => ({ value: k, label: f.label }))} aria-label="Fact" className="!h-11 !text-[13px]" />
-                  <Select value={c.op} onChange={(v) => setCondition(ri, ci, { ...c, op: v })} options={Object.entries(OPERATOR_LABELS).map(([k, l]) => ({ value: k as RuleCondition['op'], label: l }))} aria-label="Operator" className="!h-11" />
+                  <Select value={c.op} onChange={(v) => setCondition(ri, ci, { ...c, op: v })} options={Object.entries(OPERATOR_LABELS).map(([k, l]) => ({ value: k as RuleCondition['op'], label: l }))} aria-label="Operator" className="!h-11 !pr-7 !pl-3" />
                   {typeof c.value === 'boolean' ? (
                     <Select value={String(c.value)} onChange={(v) => setCondition(ri, ci, { ...c, value: v === 'true' })} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} aria-label="Value" className="!h-11" />
                   ) : (

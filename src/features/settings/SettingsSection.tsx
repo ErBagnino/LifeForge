@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Field, List, NumberInput, Row, Segmented, Select, TextInput, TimeInput, Toggle } from '@/components/ui/forms';
 import { Button, Card, Chip, SectionTitle } from '@/components/ui/primitives';
-import { Dialog } from '@/components/ui/Sheet';
+import { Sheet } from '@/components/ui/Sheet';
+import { RESET_INFO, RESET_PHRASE, runReset, type ResetKind } from '@/services/resetService';
 import { ACCENTS } from '@/data/cosmetics';
 import { useAsync, useLevel } from '@/hooks';
 import { tycoonRepository } from '@/repositories';
@@ -485,8 +486,13 @@ function DataPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [error, setError] = useState('');
-  const [confirmWipe, setConfirmWipe] = useState(false);
+  const act = useGame((s) => s.act);
+  const [reset, setReset] = useState<ResetKind | null>(null);
+  const [typed, setTyped] = useState('');
+  const [resetting, setResetting] = useState(false);
   const [done, setDone] = useState('');
+  // Game progress and a full wipe need a typed phrase; the smaller resets a tap on the red button.
+  const phraseFor = (k: ResetKind) => (k === 'all' ? RESET_PHRASE : k === 'game' ? 'RESET' : '');
   return (
     <div className="mt-2">
       <p className="px-1 text-[13px] text-muted">Everything lives in this browser (IndexedDB). Export a JSON backup now and then — it’s your safety net.</p>
@@ -554,23 +560,76 @@ function DataPanel() {
           )}
         </Card>
       )}
+      <SectionTitle>Reset</SectionTitle>
+      <List footer="Each reset shows exactly what is deleted and what is kept before anything happens. Export a backup first if in doubt.">
+        {(['today', 'week', 'workouts', 'nutrition', 'game'] as const).map((k) => (
+          <Row key={k} title={RESET_INFO[k].title} subtitle={RESET_INFO[k].deletes.slice(0, 2).join(' · ')} onClick={() => setReset(k)} chevron />
+        ))}
+      </List>
       <SectionTitle>Danger zone</SectionTitle>
-      <Button block variant="danger" icon="trash" onClick={() => setConfirmWipe(true)}>
+      <Button block variant="danger" icon="trash" onClick={() => setReset('all')}>
         Erase everything
       </Button>
-      <Dialog
-        open={confirmWipe}
-        title="Erase all data?"
-        message="This deletes your character, history and settings from this device. Export first if you want to keep anything."
-        confirmLabel="Erase"
-        destructive
-        onCancel={() => setConfirmWipe(false)}
-        onConfirm={async () => {
-          await wipeAllData();
-          setConfirmWipe(false);
-          await boot();
-        }}
-      />
+      <Sheet open={!!reset} onClose={() => setReset(null)} title={reset ? RESET_INFO[reset].title : ''}>
+        {reset && (
+          <div>
+            <div className="rounded-2xl bg-danger/8 p-3">
+              <div className="text-[12px] font-extrabold tracking-[0.14em] text-danger">DELETES</div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[14px]">
+                {RESET_INFO[reset].deletes.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-2 rounded-2xl bg-success/8 p-3">
+              <div className="text-[12px] font-extrabold tracking-[0.14em] text-success">KEEPS</div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[14px]">
+                {RESET_INFO[reset].keeps.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+            </div>
+            {phraseFor(reset) && (
+              <div className="mt-4">
+                <Field label={`Type “${phraseFor(reset)}” to confirm`}>
+                  <TextInput value={typed} onChange={setTyped} placeholder={phraseFor(reset)} aria-label="Confirmation phrase" />
+                </Field>
+              </div>
+            )}
+            <Button
+              block
+              size="lg"
+              variant="danger"
+              icon="trash"
+              className="mt-4"
+              disabled={!!phraseFor(reset) && typed.trim() !== phraseFor(reset)}
+              loading={resetting}
+              onClick={async () => {
+                const kind = reset;
+                setResetting(true);
+                try {
+                  if (kind === 'all') {
+                    await wipeAllData();
+                    await boot();
+                  } else {
+                    await act(runReset(kind));
+                    setDone(`${RESET_INFO[kind].title}: done.`);
+                  }
+                } finally {
+                  setResetting(false);
+                  setReset(null);
+                  setTyped('');
+                }
+              }}
+            >
+              {RESET_INFO[reset].title}
+            </Button>
+            <Button block variant="secondary" className="mt-2" onClick={() => setReset(null)}>
+              Cancel
+            </Button>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }

@@ -37,11 +37,11 @@ export default function ExercisesScreen() {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {list.map((e) => (
-          <button key={e.id} type="button" onClick={() => navigate(`/train/exercise/${e.id}`)} className="overflow-hidden rounded-3xl bg-surface p-2 text-left shadow-card">
+          <button key={e.id} type="button" onClick={() => navigate(`/train/exercise/${e.id}`)} className="flex flex-col justify-start overflow-hidden rounded-3xl bg-surface p-2 text-left shadow-card">
             <ExerciseIllustration illustration={e.illustration} muscles={e.muscles} size={160} mode="end" className="flex justify-center" />
             <div className="px-1 pt-2 pb-1">
               <div className="truncate text-[14px] font-bold">{e.name}</div>
-              <div className="truncate text-[11px] text-muted">{e.muscles.filter((m) => m.level === 'high').map((m) => muscleLabel(m.muscle)).join(' · ')}</div>
+              <div className="truncate text-[11px] text-muted">{e.muscles.filter((m) => m.level === 'high').map((m) => muscleLabel(m.muscle)).join(' · ') || '\u00a0'}</div>
             </div>
           </button>
         ))}

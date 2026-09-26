@@ -11,6 +11,7 @@ import { exportData, importData, validateImport } from '../exportService';
 import { finishSession, startSession, saveSession, decideSuggestion } from '../workoutService';
 import { parseAiResponse, buildAiPrompt } from '../aiImportService';
 import { clock } from '../clock';
+import { runReset } from '../resetService';
 import type { Rpe } from '@/types';
 
 let dbCounter = 0;
@@ -216,6 +217,32 @@ describe('game loop (IndexedDB)', () => {
     const [edited] = await statsRepository.mealsByDate(clock.today());
     expect(edited).toMatchObject({ name: 'Half pizza', mealType: 'lunch', kcal: 400 });
     expect(edited.items[0]).toMatchObject({ name: 'Half pizza', kcal: 400 });
+  });
+
+  it('resets: nutrition clears meals and the day totals; game resets progress but keeps history; today rebuilds the board', async () => {
+    await logMeal({ name: 'Pasta', items: [{ name: 'Pasta', kcal: 500, protein: 15, carbs: 90, fat: 8 }], kcal: 500, protein: 15, carbs: 90, fat: 8, source: 'manual' });
+    await logMetric('water', 500);
+    await logMetric('steps', 4000);
+    await runReset('nutrition');
+    let log = await statsRepository.getLog(clock.today());
+    expect(log?.metrics.calories ?? 0).toBe(0);
+    expect(log?.metrics.water ?? 0).toBe(0);
+    expect(log?.metrics.steps).toBe(4000); // not nutrition: kept
+    expect(await statsRepository.mealsByDate(clock.today())).toHaveLength(0);
+
+    const { day } = await loadDay(clock.today());
+    await completeQuest(day.find((q) => q.kind === 'first')!.id);
+    expect((await playerRepository.get())!.xp).toBeGreaterThan(0);
+    await runReset('game');
+    const p = (await playerRepository.get())!;
+    expect(p.xp).toBe(0);
+    expect(p.coins).toBe(0);
+    log = await statsRepository.getLog(clock.today());
+    expect(log?.metrics.steps).toBe(4000); // history kept
+
+    await runReset('today');
+    expect((await loadDay(clock.today())).day.length).toBeGreaterThan(0);
+    expect((await statsRepository.getLog(clock.today()))?.metrics.steps ?? 0).toBe(0);
   });
 
   it('tycoon: building is blocked by level and coins', async () => {

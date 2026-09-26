@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Avatar } from '@/components/game/Avatar';
 import { Screen } from '@/components/layout/Screen';
-import { Segmented } from '@/components/ui/forms';
 import { Card, cx } from '@/components/ui/primitives';
 import { useAsync, useLevel } from '@/hooks';
 import { tycoonRepository } from '@/repositories';
@@ -16,7 +15,7 @@ const TABS: { value: CosmeticType; label: string; key: keyof AvatarConfig }[] = 
   { value: 'outfit', label: 'Outfit', key: 'outfit' },
   { value: 'outfitColor', label: 'Tint', key: 'outfitColor' },
   { value: 'accessory', label: 'Extra', key: 'accessory' },
-  { value: 'background', label: 'BG', key: 'background' },
+  { value: 'background', label: 'Backdrop', key: 'background' },
 ];
 
 export default function AvatarEditor() {
@@ -37,8 +36,23 @@ export default function AvatarEditor() {
         <Avatar config={config} size={150} />
         <div className="mt-3 text-[13px] text-muted">Tap an item to try it. Owned items equip instantly.</div>
       </Card>
-      <div className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
-        <Segmented size="sm" className="min-w-[520px]" value={tab} onChange={(v) => { setTab(v); setPreview({}); }} options={TABS.map((t) => ({ value: t.value, label: t.label }))} />
+      {/* All seven parts visible at once (a scrolling tab bar hid "Extra" and "BG"). */}
+      <div role="tablist" aria-label="Avatar part" className="mt-4 grid grid-cols-4 gap-1.5">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.value}
+            onClick={() => {
+              setTab(t.value);
+              setPreview({});
+            }}
+            className={`h-10 rounded-xl text-[13px] font-semibold transition-colors ${tab === t.value ? 'bg-accent text-on-accent' : 'bg-surface-2 text-fg'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {items.map((c) => {

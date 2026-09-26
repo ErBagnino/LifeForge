@@ -275,7 +275,7 @@ export default function FoodScanScreen() {
                 <Icon name="camera" size={30} />
               </span>
               <span className="text-[15px] font-semibold">Point at your plate</span>
-              <span className="text-[12px]">Good light, whole plate in frame, a fork or hand helps with size</span>
+              <span className="px-10 text-center text-[12px] leading-snug">Good light, whole plate in frame — a fork or a hand helps judge the size.</span>
               <span className="pointer-events-none absolute inset-5 rounded-2xl border-2 border-dashed border-fg/15" />
             </button>
           )}

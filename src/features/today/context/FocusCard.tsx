@@ -47,7 +47,7 @@ export function FocusCard({ onStart, onOpen }: { onStart: (q: Quest) => void; on
   }
   if (!view.focus.length) return null;
   const [first, ...rest] = view.focus;
-  const title = `${info.icon} ${view.state === 'POST_WORK' ? info.label : info.greeting}`;
+  const title = `${info.icon} ${info.label}`;
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="mt-3">
@@ -77,7 +77,7 @@ export function FocusCard({ onStart, onOpen }: { onStart: (q: Quest) => void; on
         </div>
         {rest.length > 0 && <FocusList focus={rest} pet={pet} onOpen={onOpen} />}
         <p className="mt-2 text-[12px] text-muted">
-          {view.fits ? `${formatDuration(view.plannedMin)} of what matters fits in the time left.` : `More than the time left — ordered by what matters most.`}
+          {view.fits ? `All of this fits in the ${formatDuration(view.availableMin)} left (about ${formatDuration(view.plannedMin)} of work).` : `More than the time left — ordered by what matters most.`}
           {notToday > 0 ? ` ${notToday} won’t realistically fit today; they stay in the lists below.` : ''}
         </p>
       </Card>
@@ -95,7 +95,7 @@ function FocusList({ focus, pet, onOpen }: { focus: NonNullable<ReturnType<typeo
               {d.quest.icon}
             </span>
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{resolveText(d.quest.title, pet)}</span>
-            {d.quest.durationMin > 0 && !d.quest.metric && <span className="num shrink-0 text-[12px] text-muted">{d.quest.durationMin}′</span>}
+            {d.quest.durationMin >= 5 && !d.quest.metric && <span className="num shrink-0 text-[12px] text-muted">{d.quest.durationMin}′</span>}
             <PriorityChip p={d.priority} />
           </button>
         </li>

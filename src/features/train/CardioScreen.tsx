@@ -54,8 +54,8 @@ export default function CardioScreen() {
           <Field label="Duration (min)">
             <NumberInput value={duration} onChange={setDuration} min={1} aria-label="Duration" />
           </Field>
-          <Field label="Distance (km, optional)">
-            <NumberInput value={distance} onChange={setDistance} min={0} step={0.1} aria-label="Distance" />
+          <Field label="Distance (km)">
+            <NumberInput value={distance} onChange={setDistance} min={0} step={0.1} placeholder="optional" aria-label="Distance" />
           </Field>
         </div>
         <div>

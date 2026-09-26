@@ -2,7 +2,7 @@ import { SEED_BUILDINGS } from '@/data/buildings';
 import { DEFAULT_EQUIPPED } from '@/data/cosmetics';
 import { STARTING_WEIGHTS } from '@/data/exercises';
 import { levelFromXp } from '@/domain/level';
-import { getDb, metaRepository, playerRepository, settingsRepository, withTransaction } from '@/repositories';
+import { aggregateMetrics, getDb, metaRepository, playerRepository, settingsRepository, withTransaction } from '@/repositories';
 import { shiftDate, weekStart } from '@/utils/date';
 import { clock } from './clock';
 import type { ServiceResult } from './events';
@@ -108,6 +108,10 @@ export async function runReset(kind: ResetKind): Promise<ServiceResult> {
         const types = ['calories', 'protein', 'carbs', 'fat', 'water'];
         const entries = await db.metrics.toArray();
         await db.metrics.bulkDelete(entries.filter((m) => types.includes(m.type)).map((m) => m.id));
+        // Day logs cache their totals: recompute them from what is left, or today would still show the old intake.
+        const left = entries.filter((m) => !types.includes(m.type));
+        const logs = await db.dayLogs.toArray();
+        await db.dayLogs.bulkPut(logs.map((l) => ({ ...l, metrics: aggregateMetrics(left.filter((m) => m.date === l.date)) })));
       });
       break;
     case 'game':

@@ -7,7 +7,7 @@ import { Ring } from '@/components/ui/progress';
 import { Button, Card, SectionTitle } from '@/components/ui/primitives';
 import { LEISURE_KINDS } from '@/domain/leisure';
 import { useAsync } from '@/hooks';
-import { statsRepository } from '@/repositories';
+import { metaRepository, statsRepository } from '@/repositories';
 import { clock } from '@/services/clock';
 import { dailySeries } from '@/services/insightsService';
 import { cancelLeisure, deleteMetric, logMetric } from '@/services/metricsService';
@@ -26,7 +26,10 @@ export default function PlayTimeScreen() {
   const { data: series } = useAsync(() => dailySeries(shiftDate(today, -13), today), [today]);
   const { data: entries } = useAsync(async () => (await statsRepository.metricsByDate(today)).filter((m) => m.type === 'leisure').sort((a, b) => b.ts - a.ts), [today]);
   const color = p.status === 'over' ? 'var(--lf-danger)' : p.status === 'warn' ? 'var(--lf-warn)' : 'var(--lf-success)';
-  const underDays = series?.filter((d) => d.date !== today && d.leisure <= p.limit).length ?? 0;
+  const { data: adventureStart } = useAsync(() => metaRepository.get<string>('adventureStart'), []);
+  // Only days since the adventure started count: days before it have no data, not a success.
+  const past = series?.filter((d) => d.date !== today && (!adventureStart || d.date >= adventureStart)) ?? [];
+  const underDays = past.filter((d) => d.leisure <= p.limit).length;
 
   return (
     <Screen back title="Play time" subtitle={`Daily budget: ${p.limit} min (games, TikTok, reels, streaming). Video calls with your partner never count.`}>
@@ -96,7 +99,13 @@ export default function PlayTimeScreen() {
       <SectionTitle>Last 14 days</SectionTitle>
       <Card>
         <div className="mb-2 text-[13px] text-muted">
-          Under budget on <span className="font-bold text-success">{underDays}</span> of the last 13 days.
+          {past.length ? (
+            <>
+              Under budget on <span className="font-bold text-success">{underDays}</span> of the last {past.length} {past.length === 1 ? 'day' : 'days'}.
+            </>
+          ) : (
+            'Your first day — this view fills in as the days go by.'
+          )}
         </div>
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">

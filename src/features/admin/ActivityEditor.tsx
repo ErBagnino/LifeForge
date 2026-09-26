@@ -195,7 +195,7 @@ export default function ActivityEditor() {
 
       <SectionTitle>Amount</SectionTitle>
       <div className="grid grid-cols-3 gap-2">
-        <Field label="Duration (min)">
+        <Field label="Minutes">
           <NumberInput value={a.durationMin} onChange={(v) => set({ durationMin: Math.max(1, Math.round(v)) })} aria-label="Duration" />
         </Field>
         <Field label="Quantity">
@@ -241,11 +241,11 @@ export default function ActivityEditor() {
       <p className="mt-1 px-1 text-[11px] text-muted">0 = use the formula. Negative energy = restores energy (recovery).</p>
 
       <SectionTitle>Stat gains</SectionTitle>
-      <Card className="grid grid-cols-2 gap-x-3 gap-y-2">
+      <Card className="divide-y divide-line !py-1">
         {STAT_KEYS.map((k) => (
-          <div key={k} className="flex items-center justify-between">
-            <span className="text-[13px]">
-              {STAT_INFO[k].icon} {STAT_INFO[k].short}
+          <div key={k} className="flex min-h-12 items-center justify-between gap-2 py-1">
+            <span className="min-w-0 truncate text-[14px] font-semibold">
+              <span aria-hidden>{STAT_INFO[k].icon}</span> {STAT_INFO[k].label}
             </span>
             <Stepper size="sm" label={STAT_INFO[k].label} value={a.stats[k] ?? 0} onChange={(v) => set({ stats: { ...a.stats, [k]: v || undefined } })} min={0} max={5} />
           </div>

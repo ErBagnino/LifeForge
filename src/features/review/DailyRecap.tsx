@@ -59,7 +59,7 @@ export default function DailyRecap() {
         <Kpi label="Water" value={formatMl(m.water ?? 0)} sub={`/ ${formatMl(settings.hydration.targetMl)}`} icon="💧" />
         <Kpi label="Play time" value={`${Math.round(m.leisure ?? 0)}m`} sub={`/ ${settings.leisure.dailyLimitMin}m`} icon="🎮" />
         <Kpi label="Calories" value={formatInt(m.calories ?? 0)} sub={`/ ${formatInt(n.calories)}`} icon="🔥" />
-        <Kpi label="Protein" value={`${formatInt(m.protein ?? 0)}g`} sub={`/ ${n.protein}g`} icon="🥩" />
+        <Kpi label="Protein" value={`${formatInt(m.protein ?? 0)} g`} sub={`/ ${n.protein} g`} icon="🥩" />
         <Kpi label="Sleep" value={m.sleep ? `${m.sleep}h` : '—'} icon="😴" />
       </div>
 

@@ -224,7 +224,16 @@ export default function WorkoutLogger() {
             </Card>
           );
         })}
-        <Button block variant="secondary" icon="plus" onClick={() => setPicker(true)}>
+        {!session.exercises.length && (
+          <div className="rounded-3xl bg-surface px-5 py-6 text-center shadow-card">
+            <div className="text-[36px]" aria-hidden>
+              🏋️
+            </div>
+            <div className="mt-1 text-[16px] font-bold">Free workout</div>
+            <p className="mt-1 text-[13px] text-muted">Add your first exercise, then log each set as you go. Finish saves the session and its XP.</p>
+          </div>
+        )}
+        <Button block variant={session.exercises.length ? 'secondary' : 'primary'} icon="plus" onClick={() => setPicker(true)}>
           Add exercise
         </Button>
         <TextInput voice value={session.notes ?? ''} onChange={(v) => update({ ...session, notes: v.slice(0, 300) || undefined })} placeholder="Session notes (how it felt, pain, gym busy…)" aria-label="Session notes" />

@@ -142,7 +142,7 @@ export function AiPanel() {
           </span>
         </div>
         <div className="mt-2 text-[14px]">
-          Model: <b className="break-all">{status?.modelName ?? status?.model ?? '—'}</b>
+          Model: <b className="break-all">{status?.modelName || status?.model || '—'}</b>
           {status?.resolvedModel && status.resolvedModel !== status.model && <span className="text-muted"> ({status.resolvedModel})</span>}
         </div>
         {status?.message && ui !== 'connected' && <p className="mt-1 text-[13px] text-danger">{status.message}</p>}
