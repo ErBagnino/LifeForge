@@ -194,7 +194,7 @@ function Bubble({ m, last, busy, h }: { m: ChatMessage; last: boolean; busy: boo
   return (
     <motion.div data-msg={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={cx('flex scroll-mt-3', mine ? 'justify-end' : 'justify-start')}>
       <div className={cx('min-w-0', mine ? 'max-w-[82%]' : 'w-full max-w-[92%]')}>
-        <div className={cx('inline-block rounded-3xl px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap', mine ? 'rounded-br-lg bg-accent text-on-accent' : 'rounded-bl-lg bg-surface shadow-card')}>
+        <div className={cx('inline-block max-w-full rounded-3xl px-4 py-2.5 text-[15px] leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]', mine ? 'rounded-br-lg bg-accent text-on-accent' : 'rounded-bl-lg bg-surface shadow-card')}>
           {m.photo && <span className="mr-1" aria-label="Photo attached">📷</span>}
           {m.text}
           {m.ai && <span className="ml-1.5 align-middle text-[10px] font-bold tracking-wider text-muted">GEMINI</span>}

@@ -468,7 +468,7 @@ export function respond(input: { text: string; value?: string }, ctx: AssistantC
   if (!replies.length) {
     return {
       understood: false,
-      text: 'I’m not sure I got that. I can update your work schedule, one-off days, gym availability, free time, goals, wake/bed times, weight and steps.',
+      text: 'I’m not sure I got that. Without Gemini I can log water (“ho bevuto 500 ml”), complete quests, and update your work schedule, one-off days, gym availability, targets, goals, wake/bed times, weight and steps. Food estimates and open questions need Gemini.',
       quick: HELP_QUICK,
     };
   }

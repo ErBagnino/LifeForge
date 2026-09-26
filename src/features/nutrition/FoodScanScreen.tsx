@@ -443,7 +443,7 @@ export default function FoodScanScreen() {
                 <div className="mt-2 space-y-1.5" aria-live="polite">
                   {chat.map((m, i) => (
                     <div key={i} className={cx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                      <span className={cx('max-w-[85%] rounded-2xl px-3 py-1.5 text-[13px] leading-snug', m.role === 'user' ? 'bg-accent text-on-accent' : 'bg-surface-2')}>{m.text}</span>
+                      <span className={cx('max-w-[85%] rounded-2xl px-3 py-1.5 text-[13px] leading-snug [overflow-wrap:anywhere]', m.role === 'user' ? 'bg-accent text-on-accent' : 'bg-surface-2')}>{m.text}</span>
                     </div>
                   ))}
                 </div>
