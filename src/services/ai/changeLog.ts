@@ -6,6 +6,7 @@ import { uid } from '@/utils/id';
 import { clock } from '../clock';
 import type { ServiceResult } from '../events';
 import { refreshToday, uncompleteQuest } from '../game/questService';
+import { deleteMeal, deleteMetric } from '../metricsService';
 
 /**
  * Change log for everything the Coach changes, with Undo.
@@ -102,6 +103,14 @@ export async function undoChange(id: string): Promise<UndoResult> {
     const q = await db.quests.get(change.undo.questId);
     if (!q || q.status !== 'completed') return { success: false, message: 'The quest is no longer completed.', events: [] };
     events = (await uncompleteQuest(change.undo.questId)).events;
+  } else if (change.undo.kind === 'meal') {
+    const meal = await db.meals.get(change.undo.mealId);
+    if (!meal) return { success: false, message: 'That meal was already removed.', events: [] };
+    events = (await deleteMeal(meal)).events;
+  } else if (change.undo.kind === 'metric') {
+    const entry = await db.metrics.get(change.undo.metricId);
+    if (!entry) return { success: false, message: 'That entry was already removed.', events: [] };
+    events = (await deleteMetric(entry)).events;
   } else if (change.undo.kind === 'unskip') {
     const before = change.undo.before;
     await withTransaction(async () => {

@@ -45,6 +45,11 @@ function num(s: string): number {
   return Number(s.replace(/\./g, '').replace(',', '.'));
 }
 
+/** Litres: "1.5" and "1,5" are decimals here (unlike "1.900 kcal", where the dot groups thousands). */
+function litres(s: string): number {
+  return Number(s.replace(',', '.'));
+}
+
 /** One specific date the user mentioned ("domani", "venerdì", "il 21 febbraio"). */
 export function findDate(t: string, today: ISODate): ISODate | undefined {
   if (/\bdopodomani\b|\bday after tomorrow\b/.test(t)) return shiftDate(today, 2);
@@ -128,8 +133,17 @@ export function ruleIntent(raw: string, today: ISODate): RuleIntent | undefined 
   }
   const water = /(\d(?:[.,]\d)?)\s*(?:l|litri|litro|liters?|litres?)\b/.exec(t) ?? /(\d{3,4})\s*ml\b/.exec(t);
   if (target && water && /acqua|water|bere|drink|idrata|hydrat/.test(t)) {
-    const ml = /ml/.test(water[0]) ? Number(water[1]) : Math.round(num(water[1]) * 1000);
+    const ml = /ml/.test(water[0]) ? Number(water[1]) : Math.round(litres(water[1]) * 1000);
     return { kind: 'tools', text: 'Here’s the new water target:', calls: [{ name: 'updateWaterGoal', args: { targetMl: ml } }] };
+  }
+
+  // Water the player drank: "ho bevuto 500 ml", "ho bevuto un litro d'acqua", "I drank 1.5 l".
+  // Negations and plans ("non ho bevuto", "domani berrò") never log anything.
+  const drank = /\b(ho bevuto|bevuto|drank|i drunk|i had)\b/.test(t);
+  const amount = water ?? (/\bun (?:litro|liter|litre)\b/.test(t) ? ['1 l', '1'] : /\bmezzo litro\b|\bhalf a liter\b/.test(t) ? ['0.5 l', '0.5'] : null);
+  if (drank && amount && !target && !NOT_DONE.test(t) && !raw.trim().endsWith('?')) {
+    const ml = /ml/.test(amount[0]) ? Number(amount[1]) : Math.round(litres(amount[1]) * 1000);
+    if (ml >= 50 && ml <= 3000) return { kind: 'tools', text: `Logging ${ml} ml of water:`, calls: [{ name: 'logWater', args: { ml } }] };
   }
 
   // Achievement for N workouts
@@ -234,5 +248,5 @@ export function isLocalCommand(raw: string, today: ISODate, quests: { id: string
   if (completionIntent(raw, quests)) return true;
   const r = ruleIntent(raw, today);
   if (r?.kind === 'ask') return true;
-  return r?.kind === 'tools' && r.calls.every((c) => c.name === 'updateNutritionTargets' || c.name === 'updateWaterGoal' || c.name === 'createAchievement');
+  return r?.kind === 'tools' && r.calls.every((c) => c.name === 'updateNutritionTargets' || c.name === 'updateWaterGoal' || c.name === 'createAchievement' || c.name === 'logWater');
 }

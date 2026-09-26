@@ -66,7 +66,7 @@ export interface LogMetricOptions {
   refId?: string;
 }
 
-export function logMetric(type: MetricType, value: number, opts: LogMetricOptions = {}): Promise<QuestResult> {
+export function logMetric(type: MetricType, value: number, opts: LogMetricOptions = {}): Promise<QuestResult & { entryId?: string }> {
   return withTransaction(async () => {
     const date = opts.date ?? clock.today();
     const tx = await GameTx.open(date);
@@ -116,7 +116,7 @@ export function logMetric(type: MetricType, value: number, opts: LogMetricOption
       await settleDay(tx);
     }
     await tx.commit();
-    return { events: tx.events, features: tx.unlockedFeatures };
+    return { events: tx.events, features: tx.unlockedFeatures, entryId: entry.id };
   });
 }
 
@@ -211,7 +211,7 @@ const MACROS: [MetricType, keyof Pick<Meal, 'kcal' | 'protein' | 'carbs' | 'fat'
 ];
 
 /** Log a meal: stored with its items/photo, and its macros feed the daily metrics (and quests). */
-export async function logMeal(input: MealInput): Promise<QuestResult> {
+export async function logMeal(input: MealInput): Promise<QuestResult & { mealId: string }> {
   const date = input.date ?? clock.today();
   const { ts, ...rest } = input;
   const meal: Meal = { ...rest, id: uid('meal_'), ts: ts ?? clock.now(), date };
@@ -225,7 +225,7 @@ export async function logMeal(input: MealInput): Promise<QuestResult> {
     events.push(...r.events);
     features.push(...r.features);
   }
-  return { events, features };
+  return { events, features, mealId: meal.id };
 }
 
 /**

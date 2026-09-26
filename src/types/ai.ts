@@ -42,6 +42,6 @@ export interface AiChange {
   tool: string;
   summary: string;
   source: 'gemini' | 'rules' | 'user';
-  undo?: { kind: 'snapshot'; entries: ChangeSnapshot[] } | { kind: 'uncomplete'; questId: ID } | { kind: 'unskip'; questId: ID; before: unknown };
+  undo?: { kind: 'snapshot'; entries: ChangeSnapshot[] } | { kind: 'uncomplete'; questId: ID } | { kind: 'unskip'; questId: ID; before: unknown } | { kind: 'meal'; mealId: ID } | { kind: 'metric'; metricId: ID };
   undoneAt?: Timestamp;
 }

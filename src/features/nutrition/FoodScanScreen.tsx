@@ -404,6 +404,12 @@ export default function FoodScanScreen() {
             </div>
             <MealPicker value={mealType} onChange={setMealType} />
 
+            {estimate.overallConfidence === 'low' && !corrected && (
+              <div className="mt-3 rounded-2xl bg-warn/10 px-3 py-2 text-[13px] leading-snug">
+                <b>Low confidence.</b> I can’t judge this photo well — tell me what it is or roughly how much (below), or use your own values.
+              </div>
+            )}
+
             {diff && <DiffCard diff={diff.d} summary={diff.summary} />}
 
             {estimate.questions.length > 0 && (
@@ -487,13 +493,27 @@ export default function FoodScanScreen() {
                   CANCEL
                 </Button>
               </div>
+              <button type="button" onClick={() => setManual(true)} className="mt-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-accent">
+                Use my own values instead
+              </button>
             </div>
           </>
         )}
 
         {manual && (
           <div className="mt-4">
-            <MealBuilder photo={settings.coach.ai.savePhotos ? thumb : undefined} source={image ? 'photo' : 'manual'} name={estimate?.mealName ?? ''} onDone={() => navigate('/nutrition', { replace: true })} />
+            <MealBuilder
+              photo={settings.coach.ai.savePhotos ? thumb : undefined}
+              source={image ? 'photo' : 'manual'}
+              name={estimate?.mealName ?? ''}
+              initial={estimate && totals ? { kcal: totals.calories, protein: totals.protein, carbs: totals.carbs, fat: totals.fat } : undefined}
+              onDone={() => navigate('/nutrition', { replace: true })}
+            />
+            {estimate && (
+              <button type="button" onClick={() => setManual(false)} className="mt-2 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-accent">
+                Back to the AI estimate
+              </button>
+            )}
           </div>
         )}
       </div>

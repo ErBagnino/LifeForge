@@ -5,6 +5,9 @@ import { MEAL_INFO, MEAL_TYPES, mealTypeAt, type MealType } from '@/config/meals
 import { FOOD_PRESETS } from '@/data/foods';
 import { clock } from '@/services/clock';
 import { logMeal } from '@/services/metricsService';
+import { useAsync } from '@/hooks';
+import { statsRepository } from '@/repositories';
+import { shiftDate } from '@/utils/date';
 import { useGame } from '@/store/gameStore';
 import type { Meal } from '@/types';
 import { dateTimeToTs, tsToHm } from '@/utils/date';
@@ -50,17 +53,24 @@ const EMPTY: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
  * ADD FOOD: what did you eat → meal (pre-selected from the clock) → time → calories and macros
  * → ADD FOOD. No categories. Presets only fill the fields; everything stays editable.
  */
-export function MealBuilder({ photo, source = 'manual', name: initialName = '', onDone }: { photo?: string; source?: Meal['source']; name?: string; onDone?: () => void }) {
+export function MealBuilder({ photo, source = 'manual', name: initialName = '', initial, onDone }: { photo?: string; source?: Meal['source']; name?: string; initial?: Partial<Macros>; onDone?: () => void }) {
   const act = useGame((s) => s.act);
   const dayStartHour = useGame((s) => s.settings?.dayStartHour ?? 4);
   const [name, setName] = useState(initialName);
   const [time, setTime] = useState(() => tsToHm(clock.now()));
   const [mealType, setMealType] = useState<MealType>(() => mealTypeAt(new Date(clock.now())));
   const [pickedMeal, setPickedMeal] = useState(false);
-  const [macros, setMacros] = useState<Macros>(EMPTY);
+  const [macros, setMacros] = useState<Macros>(() => ({ ...EMPTY, ...initial }));
   const [preset, setPreset] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const ready = name.trim().length > 0 && Object.values(macros).some((v) => v > 0);
+  // Recent foods (last 3 weeks, one per name, newest first): one tap refills a meal you eat often.
+  const { data: recent } = useAsync(async () => {
+    const today = clock.today();
+    const meals = (await statsRepository.mealsRange(shiftDate(today, -21), today)).sort((a, b) => b.ts - a.ts);
+    const seen = new Set<string>();
+    return meals.filter((m) => m.kcal > 0 && !seen.has(m.name.toLowerCase()) && seen.add(m.name.toLowerCase())).slice(0, 8);
+  }, [], { live: false });
 
   const onTime = (hm: string) => {
     setTime(hm);
@@ -103,7 +113,29 @@ export function MealBuilder({ photo, source = 'manual', name: initialName = '', 
         />
       </Field>
 
-      <div className="mt-2 -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scroll-touch" aria-label="Quick fill">
+      {!!recent?.length && (
+        <>
+          <div className="mt-3 px-1 text-[12px] font-semibold text-muted">Recent</div>
+          <div className="mt-1 -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scroll-touch" aria-label="Recent foods">
+            {recent.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  setPreset(null);
+                  setName(m.name);
+                  setMacros({ kcal: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) });
+                }}
+                className="flex h-9 shrink-0 items-center gap-1 rounded-full bg-surface px-3 text-[13px] font-semibold whitespace-nowrap shadow-card"
+              >
+                {m.name} <span className="num font-medium text-muted">{Math.round(m.kcal)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mt-3 px-1 text-[12px] font-semibold text-muted">Quick fill</div>
+      <div className="mt-1 -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scroll-touch" aria-label="Quick fill">
         {FOOD_PRESETS.map((f) => (
           <button
             key={f.id}

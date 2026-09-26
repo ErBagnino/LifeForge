@@ -53,9 +53,22 @@ describe('on-device commands (no AI call)', () => {
     expect(completionIntent('mark reading done', quests)).toBeUndefined(); // two "read" quests → ambiguous, don't guess
     expect(completionIntent('Come sto andando?', quests)).toBeUndefined();
   });
+  it('logs water the player drank, on the device; negations, plans and questions log nothing', async () => {
+    const { ruleIntent, isLocalCommand } = await import('../ruleIntents');
+    expect(ruleIntent('Ho bevuto 500ml', TODAY)).toMatchObject({ kind: 'tools', calls: [{ name: 'logWater', args: { ml: 500 } }] });
+    expect(ruleIntent("Ho bevuto un litro d'acqua", TODAY)).toMatchObject({ calls: [{ name: 'logWater', args: { ml: 1000 } }] });
+    expect(ruleIntent('I drank 1.5 l of water', TODAY)).toMatchObject({ calls: [{ name: 'logWater', args: { ml: 1500 } }] });
+    expect(isLocalCommand('Ho bevuto 500ml', TODAY, quests)).toBe(true);
+    // regression: '2.5 litri' was read as 25 litres
+    expect(ruleIntent("Porta l'obiettivo acqua a 2.5 litri", TODAY)).toMatchObject({ calls: [{ name: 'updateWaterGoal', args: { targetMl: 2500 } }] });
+    for (const s of ['Non ho bevuto 500 ml', 'Domani berrò 2 litri', 'Ho bevuto 500 ml?', "Voglio bere 2 litri d'acqua al giorno"]) {
+      const r = ruleIntent(s, TODAY);
+      expect(r && 'calls' in r ? r.calls.map((c) => c.name) : []).not.toContain('logWater');
+    }
+  });
   it('never completes on a negation, a question or a plan (regression: "Non ho fatto il workout" completed it)', async () => {
     const { completionIntent } = await import('../ruleIntents');
-    for (const s of ['Non ho fatto il workout', "I didn't do the workout", 'Ho fatto la palestra?', 'Domani faccio la palestra', 'Devo ancora fare la palestra', 'Not done with the workout', 'Se ho tempo faccio la palestra']) expect(completionIntent(s, quests)).toBeUndefined();
+    for (const s of ['non ho fatto palestra', 'domani farò palestra', 'Non ho fatto il workout', "I didn't do the workout", 'Ho fatto la palestra?', 'Domani faccio la palestra', 'Devo ancora fare la palestra', 'Not done with the workout', 'Se ho tempo faccio la palestra']) expect(completionIntent(s, quests)).toBeUndefined();
   });
   it('isLocalCommand: targets, reset clarification and completions stay on the device', async () => {
     const { isLocalCommand } = await import('../ruleIntents');

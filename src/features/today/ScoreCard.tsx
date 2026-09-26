@@ -38,6 +38,7 @@ export function ScoreCard() {
           <div className="num mt-1.5 text-[12px] text-muted">
             {coreLeft > 0 ? `${coreLeft} core left` : log?.core.total ? 'Core done ✓' : 'No core today'} · streak line {threshold}
           </div>
+          {log?.breakdown && <div className="mt-1 text-[12px] font-semibold text-accent">{open ? 'Hide details ▴' : 'Why this score? ▾'}</div>}
         </div>
       </div>
       {open && log?.breakdown && (

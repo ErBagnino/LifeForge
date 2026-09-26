@@ -42,6 +42,14 @@ describe('AI tool registry', () => {
     const { result: w } = await execute(await action('logWater', { ml: 500 }), { source: 'gemini' });
     expect(w.success).toBe(true);
     expect((await statsRepository.getLog('2026-09-23'))?.metrics.water).toBe(500);
+    // Both can be undone from the chat; totals go back through the normal services.
+    expect(r.undoable && w.undoable).toBe(true);
+    expect((await undoChange(w.changeId!)).success).toBe(true);
+    expect((await undoChange(r.changeId!)).success).toBe(true);
+    expect(await getDb().meals.count()).toBe(0);
+    const after = (await statsRepository.getLog('2026-09-23'))?.metrics;
+    expect(after?.calories ?? 0).toBe(0);
+    expect(after?.water ?? 0).toBe(0);
     expect(validateCall({ name: 'logFood', args: { name: 'x', kcal: -5, protein: 0, carbs: 0, fat: 0 } }).ok).toBe(false);
   });
 

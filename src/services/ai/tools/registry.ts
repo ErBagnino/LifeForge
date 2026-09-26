@@ -140,7 +140,11 @@ async function executeOnce(action: PreparedAction, opts: { source: 'gemini' | 'r
       const undo =
         action.plan.undo === 'uncomplete' && typeof value.data?.questId === 'string'
           ? ({ kind: 'uncomplete', questId: value.data.questId } as const)
-          : entries.length
+          : action.plan.undo === 'meal' && typeof value.data?.mealId === 'string'
+            ? ({ kind: 'meal', mealId: value.data.mealId } as const)
+            : action.plan.undo === 'metric' && typeof value.data?.metricId === 'string'
+              ? ({ kind: 'metric', metricId: value.data.metricId } as const)
+              : entries.length
             ? ({ kind: 'snapshot', entries } as const)
             : undefined;
       changeId = (await logChange({ tool: action.call.name, summary: action.title, source: opts.source, undo })).id;

@@ -47,7 +47,8 @@ export interface Plan {
   /** Typed phrase required before applying (full reset). */
   confirmPhrase?: string;
   /** How the change can be undone. */
-  undo: 'snapshot' | 'uncomplete' | 'none';
+  /** meal / metric: undone through deleteMeal / deleteMetric, so totals, quests and rewards stay consistent. */
+  undo: 'snapshot' | 'uncomplete' | 'meal' | 'metric' | 'none';
   apply(): Promise<{ message: string; data?: Record<string, unknown>; events: GameEvent[] }>;
 }
 
@@ -414,10 +415,10 @@ export const WRITE_TOOLS: Record<string, PlanFn> = {
         { label: 'Protein · Carbs · Fat', after: `~${v.protein} · ${v.carbs} · ${v.fat} g` },
       ],
       warnings: ['Estimated values — you can edit or delete the meal in Nutrition.'],
-      undo: 'none',
+      undo: 'meal',
       async apply() {
         const r = await logMeal({ name, mealType, ts, items: [{ name, ...v }], ...v, source: 'ai' });
-        return { message: `Logged "${name}" (~${v.kcal} kcal) as ${MEAL_INFO[mealType].label}.`, data: { ...v, mealType }, events: r.events };
+        return { message: `Logged "${name}" (~${v.kcal} kcal) as ${MEAL_INFO[mealType].label}.`, data: { ...v, mealType, mealId: r.mealId }, events: r.events };
       },
     };
   },
@@ -429,10 +430,10 @@ export const WRITE_TOOLS: Record<string, PlanFn> = {
       title: `Log water: ${ml} ml`,
       lines: [{ label: 'Water today', before: `${(before / 1000).toFixed(2)} L`, after: `${((before + ml) / 1000).toFixed(2)} L` }],
       warnings: [],
-      undo: 'none',
+      undo: 'metric',
       async apply() {
         const r = await logMetric('water', ml);
-        return { message: `Logged ${ml} ml of water.`, data: { ml }, events: r.events };
+        return { message: `Logged ${ml} ml of water.`, data: { ml, metricId: r.entryId }, events: r.events };
       },
     };
   },

@@ -8,7 +8,7 @@ import { tierCount } from '@/domain/score';
 import { clock } from '@/services/clock';
 import { confirmWake, startDay, wakeNotYet } from '@/services/contextService';
 import { useGame } from '@/store/gameStore';
-import { dateTimeToTs, formatDate } from '@/utils/date';
+import { dateTimeToTs, daysBetween, formatDate } from '@/utils/date';
 
 const GREETING = { morning: 'GOOD MORNING', afternoon: 'GOOD AFTERNOON', evening: 'GOOD EVENING', night: 'HELLO' } as const;
 
@@ -35,15 +35,38 @@ export function DailyOpeningCard() {
   const core = tierCount(today.quests, 'core');
   const difficulty = DIFFICULTY_STATE_INFO[today.log?.difficultyState ?? 'balanced'];
   const name = (settings.profile.nickname || player.name || 'player').toUpperCase();
+  const awayDays = opening.lastVisit ? daysBetween(opening.lastVisit, today.date) : 0;
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
       <Card className="bg-gradient-to-br from-accent/10 to-xp/10">
-        {opening.welcomeBack && opening.lastVisit && (
+        {opening.welcomeBack && opening.lastVisit && (awayDays >= 7 ? (
+          <div className="mb-3 rounded-2xl bg-surface p-3">
+            <div className="text-[12px] font-extrabold tracking-[0.16em] text-accent">WELCOME BACK</div>
+            <p className="mt-1 text-[13px] leading-snug">
+              {awayDays} days since your last visit ({formatDate(opening.lastVisit, 'd MMM')}). Everything you built is still here — nothing was marked as failed.
+            </p>
+            <div className="num mt-2 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-surface-2 py-1.5">
+                <div className="text-[16px] font-extrabold">Lv {player.level}</div>
+                <div className="text-[11px] text-muted">level</div>
+              </div>
+              <div className="rounded-xl bg-surface-2 py-1.5">
+                <div className="text-[16px] font-extrabold">{player.streak.longest} d</div>
+                <div className="text-[11px] text-muted">best streak</div>
+              </div>
+              <div className="rounded-xl bg-surface-2 py-1.5">
+                <div className="text-[16px] font-extrabold">{player.streak.brokenValue ?? player.streak.current} d</div>
+                <div className="text-[11px] text-muted">last run</div>
+              </div>
+            </div>
+            <p className="mt-2 text-[13px] font-semibold">A new run starts today — one small win is enough.</p>
+          </div>
+        ) : (
           <p className="mb-3 rounded-2xl bg-surface px-3 py-2 text-[13px]">
             <b>Welcome back.</b> Last visit: {formatDate(opening.lastVisit, 'EEE d MMM')}. Days without the app only affected your streak — nothing was marked as failed or invented.
           </p>
-        )}
+        ))}
         <div className="text-[12px] font-extrabold tracking-[0.16em] text-accent">
           {GREETING[opening.kind]}, {name}
         </div>

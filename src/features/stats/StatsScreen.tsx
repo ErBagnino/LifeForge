@@ -32,7 +32,7 @@ export default function StatsScreen() {
       <div className="grid grid-cols-2 gap-2">
         <Kpi label="Avg score" value={avg || '—'} icon="🎯" />
         <Kpi label="XP gained" value={formatCompact(weekXp)} icon="✨" color="var(--lf-xp)" />
-        <Kpi label="Streak" value={`${player.streak.current} d`} sub={`best ${player.streak.longest} · weekly ${player.streak.weekly.current}`} icon="🔥" />
+        <Kpi label="Streak" value={`${player.streak.current} d`} sub={player.streak.current === 0 && player.streak.brokenValue ? `last run ${player.streak.brokenValue} · best ${player.streak.longest}` : `best ${player.streak.longest} · weekly ${player.streak.weekly.current}`} icon="🔥" />
         <Kpi label="Avg steps" value={steps.length ? formatInt(mean(steps.map((d) => d.steps))) : '—'} icon="👟" />
       </div>
 

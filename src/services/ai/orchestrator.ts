@@ -206,7 +206,8 @@ async function loop(state: ChatState, contents: GeminiContent[], ctx: LoopCtx): 
     if (cards.length) state = { ...state, messages: [...state.messages, coachMsg(res.text || 'Done:', { ai: true, actions: cards })] };
     contents.push({ role: 'user', parts: responseParts(calls) });
   }
-  const text = res.text.trim() || localSummary(ctx.cards);
+  // An empty reply with nothing done is said plainly, not dressed up as "Nothing changed."
+  const text = res.text.trim() || (ctx.cards.length ? localSummary(ctx.cards) : 'Gemini returned an empty answer. Try asking again, maybe in different words.');
   const msg = coachMsg(text, { ai: true, ...(ctx.switched ? { notice: { kind: 'switched', text: 'AI model switched automatically.' } } : {}) });
   const next = await save({ ...state, messages: [...state.messages, msg], awaiting: undefined, transcript: remember(state, ctx.userText, text) });
   return { state: next, result: { events: ctx.events } };

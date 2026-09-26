@@ -156,4 +156,11 @@ export async function wipeAllData(): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
     for (const t of db.tables) await t.clear();
   });
+  // A full erase behaves like a new install: also forget per-device UI state (theme, accent,
+  // collapsed sections, dismissed prompts). Everything else lives in IndexedDB.
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('lf-')) localStorage.removeItem(k);
+  } catch {
+    // storage unavailable (private mode): nothing to clear
+  }
 }
