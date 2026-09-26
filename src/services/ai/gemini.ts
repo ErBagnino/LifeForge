@@ -121,7 +121,7 @@ async function request<T extends { model?: string; usage?: TokenUsage | null }>(
     quota: err?.quota,
   });
   if (!res.ok) {
-    const message = kind === 'not_configured' && !err ? 'The AI API is not deployed here (it runs on Vercel or `npm run dev`).' : err?.message;
+    const message = err?.message ?? (res.status === 404 ? 'The AI API is not deployed here (it runs on Vercel or `npm run dev`).' : `The AI function failed (HTTP ${res.status}). Check Vercel → Functions / Logs.`);
     throw new AiClientError(kind!, message, err?.quota, res.status);
   }
   return data as T;
@@ -154,7 +154,11 @@ export const geminiProvider = {
     try {
       const res = await fetch(`/api/status${test ? '?test=1' : ''}`, { signal, cache: 'no-store' });
       const data = (await res.json().catch(() => null)) as StatusResponse | null;
-      if (!data || typeof data.state !== 'string') return { state: 'not_configured', provider: 'gemini', model: '', message: 'The AI API is not deployed here (it runs on Vercel or `npm run dev`).' };
+      if (!data || typeof data.state !== 'string') {
+        // Not JSON: either there is no /api here (static hosting, `npm run preview`) or the function crashed.
+        if (res.ok || res.status === 404) return { state: 'not_configured', provider: 'gemini', model: '', message: 'The AI API is not deployed here (it runs on Vercel or `npm run dev`).' };
+        return { state: 'server', provider: 'gemini', model: '', message: `The AI function failed to start (HTTP ${res.status}). Check Vercel → your deployment → Functions / Logs.` };
+      }
       if (test) {
         await recordUsage({
           ts: started,

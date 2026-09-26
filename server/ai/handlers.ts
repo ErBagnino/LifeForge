@@ -1,10 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
-import { FoodEstimateSchema, FoodRequestSchema, sumFoods } from '../../src/ai/shared/food';
-import { ChatRequestSchema, TOOL_DEFS, cleanSchema, toolJsonSchema } from '../../src/ai/shared/tools';
+import { FoodEstimateSchema, FoodRequestSchema, sumFoods } from '../../src/ai/shared/food.js';
+import { ChatRequestSchema, TOOL_DEFS, cleanSchema, toolJsonSchema } from '../../src/ai/shared/tools.js';
 import { z } from 'zod';
-import { geminiKey, geminiModel, LIMITS } from './config';
-import { AiFailure, classifyError, ERROR_MESSAGES, ERROR_STATUS, quotaDetail, type AiErrorKind } from './errors';
-import { coachSystem, foodSystem, reviseInstruction } from './prompts';
+import { geminiKey, geminiModel, LIMITS } from './config.js';
+import { AiFailure, classifyError, ERROR_MESSAGES, ERROR_STATUS, quotaDetail, type AiErrorKind } from './errors.js';
+import { coachSystem, foodSystem, reviseInstruction } from './prompts.js';
 
 /** The subset of the SDK the handlers use (injectable for tests). */
 export interface GeminiClient {
