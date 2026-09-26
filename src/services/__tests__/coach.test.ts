@@ -63,26 +63,4 @@ describe('coach service (IndexedDB)', () => {
     expect(lastCoach(state).text).toMatch(/provisional plan/);
   });
 
-  it('falls back to the optional AI model only when configured, and validates its output', async () => {
-    const s = (await settingsRepository.get())!;
-    await settingsRepository.save({ ...s, coach: { ...s.coach, ai: { enabled: true, model: 'test-model' } } });
-    const store = new Map<string, string>([['lf-ai-key', 'sk-test']]);
-    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) });
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'coach_reply', input: { reply: 'Got it: gym-free weekend.', changes: [{ type: 'exception', kind: 'no_gym', from: '2026-09-26', to: '2026-09-27' }] } }] }), { status: 200 }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    const { state } = await sendMessage(await loadChat(), { text: 'Il weekend sono in montagna senza attrezzi' });
-    const msg = lastCoach(state);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.anthropic.com/v1/messages');
-    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'test-model', tool_choice: { type: 'tool', name: 'coach_reply' } });
-    expect(msg.ai).toBe(true);
-    expect(msg.proposal?.changes).toEqual([{ type: 'exception', kind: 'no_gym', from: '2026-09-26', to: '2026-09-27' }]);
-
-    fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'coach_reply', input: { reply: 'x', changes: [{ type: 'work_schedule', days: [] }] } }] }), { status: 200 }));
-    const bad = await sendMessage(state, { text: 'qualcosa di strano' });
-    expect(lastCoach(bad.state).proposal).toBeUndefined();
-  });
 });

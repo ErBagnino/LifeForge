@@ -450,3 +450,25 @@ export function refreshToday(): Promise<QuestResult> {
 export function nowHm(): TimeHM {
   return tsToHm(clock.now());
 }
+
+/** Save one-time quests created by the Coach (any date); today's board is re-settled. */
+export function addQuests(quests: Quest[]): Promise<QuestResult> {
+  return run(async (tx) => {
+    await questRepository.bulkPut(quests.map((q) => ({ ...q, createdAt: q.createdAt ?? tx.now, updatedAt: tx.now })));
+    if (quests.some((q) => q.date === tx.date)) await settleDay(tx);
+    return quests[0];
+  });
+}
+
+/** Edit a pending quest (title, date, time, rewards…). Completed quests are not editable. */
+export function updateQuestFields(id: ID, patch: Partial<Pick<Quest, 'title' | 'date' | 'scheduledTime' | 'durationMin' | 'tier' | 'xp' | 'coins' | 'description' | 'icon'>>): Promise<QuestResult> {
+  return run(async (tx) => {
+    const q = await mustGet(id);
+    if (q.status === 'completed') throw new Error('Completed quests can’t be edited.');
+    const moved = patch.date !== undefined && patch.date !== q.date;
+    const next: Quest = { ...q, ...patch, baseTier: patch.tier ?? q.baseTier, snoozedUntil: undefined, rescheduleCount: q.rescheduleCount + (moved || patch.scheduledTime !== undefined ? 1 : 0), updatedAt: tx.now };
+    await questRepository.put(next);
+    if (q.date === tx.date || next.date === tx.date) await settleDay(tx);
+    return next;
+  });
+}

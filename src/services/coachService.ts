@@ -1,12 +1,11 @@
-import { z } from 'zod';
 import { type AssistantContext, type ConfigChange, type Pending, type Proposal, type QuickReply, respond, withWorkDays } from '@/domain/coachAssistant';
+import { ruleIntent, type RuleToolCall } from '@/domain/ruleIntents';
 import { profileFields } from '@/domain/profile';
-import { activeSchedule, describeWork, resolveEntry, summarizeSchedule, workFromPlan } from '@/domain/schedule';
+import { describeWork, resolveEntry, summarizeSchedule, workFromPlan } from '@/domain/schedule';
 import { metaRepository, questRepository, settingsRepository, statsRepository } from '@/repositories';
 import type { DayPlan, FieldStatus, ISODate, Settings, WorkDayEntry } from '@/types';
 import { formatDate } from '@/utils/date';
 import { uid } from '@/utils/id';
-import { aiReady, callTool } from './ai/claude';
 import { saveSettings } from './adminService';
 import { clock } from './clock';
 import type { ServiceResult } from './events';
@@ -42,13 +41,50 @@ export interface ChatMessage {
   proposal?: Proposal;
   quick?: QuickReply[];
   info?: InfoLine[];
-  /** Answered by the optional AI model rather than the on-device parser. */
+  /** Answered by Gemini rather than the on-device parser. */
   ai?: boolean;
+  /** Tool actions proposed in this message (preview → confirm → apply). */
+  actions?: ActionCard[];
+  /** A problem to show with this message (quota, connection…). */
+  notice?: { kind: string; text: string };
+  /** The user attached a photo (the photo itself is not kept). */
+  photo?: boolean;
+}
+
+export type ActionStatus = 'pending' | 'applied' | 'cancelled' | 'failed' | 'undone';
+
+/** A tool call shown as a card. The call is re-validated when the user applies it. */
+export interface ActionCard {
+  id: string;
+  /** Index of the Gemini function call this card answers (undefined for the basic coach). */
+  callIndex?: number;
+  name: string;
+  args: Record<string, unknown>;
+  permission: 'read' | 'low' | 'write' | 'destructive';
+  title: string;
+  lines: { label: string; before?: string; after?: string }[];
+  warnings: string[];
+  confirmPhrase?: string;
+  undoable: boolean;
+  status: ActionStatus;
+  result?: string;
+  changeId?: string;
+}
+
+/** A Gemini turn paused while the user confirms actions. */
+export interface AwaitingTurn {
+  messageId: string;
+  contents: { role: 'user' | 'model'; parts: Record<string, unknown>[] }[];
+  calls: { id?: string; name: string; args: Record<string, unknown>; result?: Record<string, unknown> }[];
+  step: number;
 }
 
 export interface ChatState {
   messages: ChatMessage[];
   pending?: Pending;
+  /** Short text-only memory of the Gemini conversation (quota-friendly). */
+  transcript?: { role: 'user' | 'model'; text: string }[];
+  awaiting?: AwaitingTurn;
 }
 
 const KEY = 'coachChat';
@@ -58,7 +94,7 @@ export async function loadChat(): Promise<ChatState> {
   return (await metaRepository.get<ChatState>(KEY)) ?? { messages: [] };
 }
 
-async function save(state: ChatState): Promise<ChatState> {
+export async function save(state: ChatState): Promise<ChatState> {
   const trimmed = { ...state, messages: state.messages.slice(-MAX) };
   await metaRepository.set(KEY, trimmed);
   return trimmed;
@@ -118,7 +154,7 @@ export function applyToSettings(s: Settings, changes: ConfigChange[]): Settings 
   return next;
 }
 
-async function impactOf(proposal: Proposal, settings: Settings, today: ISODate): Promise<string[]> {
+export async function impactOf(proposal: Proposal, settings: Settings, today: ISODate): Promise<string[]> {
   const touchesToday = proposal.changes.some(
     (c) =>
       (c.type === 'work_schedule' && c.effectiveFrom <= today) ||
@@ -173,66 +209,8 @@ function statusSummary(s: Settings, today: ISODate): InfoLine[] {
   return profileFields(s, today).map((f) => ({ icon: f.icon, label: f.label, value: f.value, status: f.status }));
 }
 
-// ——— Optional AI fallback ———
 
-const Time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-const Iso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const Entry = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('off') }),
-  z.object({ kind: z.literal('unknown') }),
-  z.object({ kind: z.literal('work'), start: Time.optional(), end: Time.optional(), breakMin: z.number().int().min(0).max(240).optional(), durationMin: z.number().int().min(30).max(900).optional(), approximate: z.boolean().optional() }),
-]);
-const ChangeSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('work_status'), status: z.literal('unknown') }),
-  z.object({ type: z.literal('work_schedule'), days: z.array(Entry).length(7).describe('Index 0 = Sunday … 6 = Saturday'), effectiveFrom: Iso, variable: z.boolean().optional() }),
-  z.object({ type: z.literal('temporary_work'), dates: z.array(Iso).min(1).max(14), entry: Entry }),
-  z.object({ type: z.literal('exception'), kind: z.enum(['no_gym', 'more_time', 'less_time', 'keep_all', 'push']), from: Iso, to: Iso.optional(), note: z.string().max(80).optional() }),
-  z.object({ type: z.literal('load_mode'), mode: z.enum(['auto', 'keep_all', 'push']) }),
-  z.object({ type: z.literal('goals'), goals: z.array(z.enum(['strength', 'fat_loss', 'muscle', 'endurance', 'routine', 'nofap', 'screen', 'sleep', 'nutrition', 'order', 'learning', 'mind', 'pet'])).min(1), focus: z.string().optional() }),
-  z.object({ type: z.literal('wake'), time: Time.optional() }),
-  z.object({ type: z.literal('sleep'), time: Time.optional() }),
-  z.object({ type: z.literal('weight'), kg: z.number().min(30).max(300) }),
-  z.object({ type: z.literal('height'), cm: z.number().min(120).max(230) }),
-  z.object({ type: z.literal('steps'), ideal: z.number().int().min(2000).max(25000).optional() }),
-  z.object({ type: z.literal('training'), days: z.union([z.array(z.number().int().min(0).max(6)), z.literal('unknown')]) }),
-]);
-const AiReply = z.object({
-  reply: z.string().max(600),
-  question: z.boolean().optional(),
-  quick_replies: z.array(z.string().max(40)).max(5).optional(),
-  changes: z.array(ChangeSchema).max(6).optional(),
-});
-
-function aiSystem(s: Settings, today: ISODate): string {
-  const sch = activeSchedule(s.work, today);
-  return [
-    'You are the LifeForge Coach, a configuration assistant inside a personal life-RPG app. Reply in English, briefly and warmly.',
-    `Today is ${today} (${formatDate(today, 'EEEE')}).`,
-    `Work schedule: ${s.work.status === 'set' && sch ? summarizeSchedule(sch.days).join(', ') : s.work.status}. Goals: ${s.profile.goals.join(', ') || 'not set'}.`,
-    'Rules: only propose changes the user actually stated. NEVER invent missing times — leave start/end undefined when unknown (e.g. "probably from 9" = start 09:00, approximate, no end).',
-    'A one-off day ("tomorrow I work 10-20") is temporary_work, not a new work_schedule. If the request is ambiguous, set question=true, ask one short question and propose no changes.',
-    'Never encourage fasting, skipped meals, extreme restriction, punitive exercise or sleep deprivation. If asked, decline kindly.',
-  ].join('\n');
-}
-
-async function askAi(text: string, s: Settings, today: ISODate): Promise<{ reply: string; quick?: QuickReply[]; changes?: ConfigChange[] } | undefined> {
-  if (!aiReady(s.coach.ai.enabled, s.coach.ai.model)) return undefined;
-  const raw = await callTool<unknown>({
-    model: s.coach.ai.model,
-    system: aiSystem(s, today),
-    content: [{ type: 'text', text }],
-    tool: { name: 'coach_reply', description: 'Reply to the user and optionally propose configuration changes for them to confirm.', input_schema: z.toJSONSchema(AiReply) as Record<string, unknown> },
-  });
-  const parsed = AiReply.safeParse(raw);
-  if (!parsed.success) return { reply: 'I couldn’t turn that into a safe change. Could you rephrase it?' };
-  return {
-    reply: parsed.data.reply,
-    quick: parsed.data.quick_replies?.map((q) => ({ label: q, value: `text:${q}` })),
-    changes: parsed.data.question ? undefined : (parsed.data.changes as ConfigChange[] | undefined),
-  };
-}
-
-function describeChanges(changes: ConfigChange[], today: ISODate): string[] {
+export function describeChanges(changes: ConfigChange[], today: ISODate): string[] {
   return changes.flatMap((c): string[] => {
     switch (c.type) {
       case 'work_schedule':
@@ -251,6 +229,22 @@ function describeChanges(changes: ConfigChange[], today: ISODate): string[] {
 
 // ——— Conversation ———
 
+/** Turn basic-coach tool calls into action cards (validated + previewed, nothing applied). */
+export async function ruleCards(calls: RuleToolCall[]): Promise<ActionCard[]> {
+  const { prepare } = await import('./ai/tools/registry');
+  const cards: ActionCard[] = [];
+  for (const call of calls) {
+    const p = await prepare(call);
+    if (!p.ok) {
+      cards.push({ id: uid('a_'), name: call.name, args: call.args, permission: 'write', title: call.name, lines: [], warnings: [], undoable: false, status: 'failed', result: p.result.message });
+    } else if (p.kind === 'action') {
+      const a = p.action;
+      cards.push({ id: uid('a_'), name: a.call.name, args: a.call.args, permission: a.permission, title: a.title, lines: a.lines, warnings: a.warnings, confirmPhrase: a.confirmPhrase, undoable: a.undoable, status: 'pending' });
+    }
+  }
+  return cards;
+}
+
 export async function sendMessage(state: ChatState, input: { text: string; value?: string }): Promise<{ state: ChatState; result?: ServiceResult }> {
   const settings = await settingsRepository.get();
   if (!settings) throw new Error('Game not initialised');
@@ -265,17 +259,22 @@ export async function sendMessage(state: ChatState, input: { text: string; value
   const coach: ChatMessage = { id: uid('m_'), role: 'coach', text: reply.text, ts: Date.now(), quick: reply.quick };
   let result: ServiceResult | undefined;
 
-  if (!reply.understood) {
-    try {
-      const ai = await askAi(input.text, settings, today);
-      if (ai) {
-        coach.text = ai.reply;
-        coach.quick = ai.quick;
-        coach.ai = true;
-        if (ai.changes?.length) coach.proposal = { id: uid('p_'), title: 'Suggested change', lines: describeChanges(ai.changes, today), changes: ai.changes, status: 'pending', note: 'Proposed by the AI model — check it before applying.' };
-      }
-    } catch (e) {
-      coach.text = `${reply.text} (AI fallback unavailable: ${(e as Error).message})`;
+  if (input.value?.startsWith('tool:')) {
+    // Quick reply that names a tool (e.g. the reset clarification).
+    const name = input.value.slice(5);
+    coach.text = 'Check this before confirming:';
+    coach.quick = undefined;
+    coach.actions = await ruleCards([{ name, args: {} }]);
+  } else if (!reply.understood) {
+    const intent = ruleIntent(input.text, today);
+    if (intent?.kind === 'ask') {
+      coach.text = intent.text;
+      coach.quick = intent.quick;
+    } else if (intent?.kind === 'tools') {
+      coach.text = intent.text;
+      coach.quick = undefined;
+      coach.actions = await ruleCards(intent.calls);
+      if (coach.actions.every((a) => a.status === 'failed')) coach.text = coach.actions.map((a) => a.result).join(' ');
     }
   }
 

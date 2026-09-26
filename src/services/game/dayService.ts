@@ -446,6 +446,7 @@ export async function rebuildDay(date: ISODate): Promise<ServiceResult> {
     const removable = quests.filter(
       (q) =>
         q.status === 'pending' &&
+        q.source !== 'coach' &&
         (q.kind === 'side' || q.kind === 'challenge' || (plan.dayType === 'rest' && (q.kind === 'workout' || q.category === 'fitness' || q.category === 'cardio' || q.tier === 'optional'))),
     );
     for (const q of removable) await questRepository.remove(q.id);

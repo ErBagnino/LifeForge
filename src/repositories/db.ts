@@ -3,6 +3,8 @@ import { APP_CONFIG } from '@/config/app';
 import type {
   Achievement,
   Activity,
+  AiChange,
+  AiUsageRecord,
   Building,
   Cosmetic,
   CounterEntry,
@@ -56,6 +58,8 @@ export class LifeForgeDB extends Dexie {
   notifications!: Table<NotificationRecord, string>;
   ledger!: Table<LedgerEntry, string>;
   meals!: Table<Meal, string>;
+  aiUsage!: Table<AiUsageRecord, string>;
+  aiChanges!: Table<AiChange, string>;
 
   constructor(name: string = APP_CONFIG.dbName) {
     super(name);
@@ -88,6 +92,11 @@ export class LifeForgeDB extends Dexie {
     this.version(2).stores({
       meals: 'id, date, ts',
       metrics: 'id, date, type, refId, [date+type], [type+date]',
+    });
+    // v3: local Gemini usage log (metadata only) and the Coach change log (undo).
+    this.version(3).stores({
+      aiUsage: 'id, ts, type',
+      aiChanges: 'id, ts',
     });
   }
 }
@@ -137,5 +146,7 @@ export const TABLE_NAMES = [
   'notifications',
   'ledger',
   'meals',
+  'aiUsage',
+  'aiChanges',
 ] as const;
 export type TableName = (typeof TABLE_NAMES)[number];

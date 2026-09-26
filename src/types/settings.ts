@@ -32,11 +32,41 @@ export interface WeeklySchedule {
   days: DaySchedule[];
 }
 
+export type CoachPersonality = 'gentle' | 'balanced' | 'direct' | 'hard';
+
+export interface AiSettings {
+  /** Use Gemini (through the app's own serverless API) when it is connected. */
+  enabled: boolean;
+  /** Allow sending food photos to Gemini for estimates. */
+  foodVision: boolean;
+  /** Keep a small thumbnail of scanned meals on this device. OFF by default. */
+  savePhotos: boolean;
+  usage: AiUsageSettings;
+}
+
+/**
+ * Local usage tracking. The Gemini API does not tell the app its remaining quota, so
+ * percentages exist only against limits the player copied from Google AI Studio.
+ */
+export interface AiUsageSettings {
+  tracking: boolean;
+  /** Limits as shown in Google AI Studio for the current model/project (optional). */
+  limits: { rpm?: number; tpm?: number; rpd?: number };
+  /** Warning thresholds in percent of those limits. */
+  thresholds: { notice: number; warning: number; critical: number };
+}
+
 export interface CoachSettings {
   /** BCP-47 language for voice input, e.g. "it-IT". Empty = device language. */
   voiceLang: string;
-  /** Optional Claude connection (the API key itself is kept out of settings and backups). */
-  ai: { enabled: boolean; model: string };
+  /** Show microphone buttons (Web Speech API, where the browser supports it). */
+  voice: boolean;
+  personality: CoachPersonality;
+  /**
+   * AI preferences. The Gemini API key is NEVER stored in the app: it lives only
+   * in the server environment (Vercel env var GEMINI_API_KEY).
+   */
+  ai: AiSettings;
 }
 
 export interface NutritionTargets {

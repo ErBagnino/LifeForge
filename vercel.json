@@ -4,7 +4,8 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "functions": { "api/*.ts": { "maxDuration": 30 } },
   "headers": [
     {
       "source": "/sw.js",

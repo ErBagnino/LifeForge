@@ -56,7 +56,7 @@ export function createDefaultSettings(): Settings {
     known: { wake: 'not_set', sleep: 'not_set', training: 'not_set', steps: 'not_set', height: 'set', weight: 'set', goals: 'not_set' },
     exceptions: [],
     load: { mode: 'auto' },
-    coach: { voiceLang: '', ai: { enabled: false, model: '' } },
+    coach: { voiceLang: '', voice: true, personality: 'direct', ai: { enabled: true, foodVision: true, savePhotos: false, usage: { tracking: true, limits: {}, thresholds: { notice: 70, warning: 85, critical: 95 } } } },
     nutrition: { calories: 1800, protein: 150, fat: 55, carbs: 175 },
     body: { weightKg: 74, heightCm: 170, goal: 'lose' },
     steps: { min: 5500, ideal: 6500, stretch: 8500 },

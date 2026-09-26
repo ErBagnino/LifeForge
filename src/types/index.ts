@@ -9,3 +9,4 @@ export * from './achievement';
 export * from './settings';
 export * from './misc';
 export * from './schedule';
+export * from './ai';

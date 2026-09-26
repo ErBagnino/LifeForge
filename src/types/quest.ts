@@ -91,6 +91,9 @@ export interface Quest {
   baseTier?: QuestTier;
   /** The player said "Keep this task": balancing never demotes it again. */
   kept?: boolean;
+  /** Created by the player through the Coach (never removed when the day is rebuilt). */
+  source?: 'coach';
+  notes?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

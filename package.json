@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "LIFEFORGE \u2014 a personal life tycoon / RPG. Your real life is the game.",
+  "description": "LIFEFORGE — a personal life tycoon / RPG. Your real life is the game.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -20,6 +20,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@google/genai": "^2.24.0",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.6",
     "motion": "^13.4.4",

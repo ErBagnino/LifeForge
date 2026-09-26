@@ -129,6 +129,7 @@ export async function generateLongQuests(ctx: FactoryContext, tctx: TemplateCont
   const out: Quest[] = [];
   const g = ctx.settings.rules.generator;
   const ws = weekStart(ctx.date);
+  existingLong = existingLong.filter((q) => q.source !== 'coach'); // player goals don't replace generated ones
   if (ctx.level >= FEATURE_LEVELS.weekly && g.weeklyCount > 0 && !existingLong.some((q) => q.kind === 'weekly' && q.date === ws)) {
     const picked = pickTemplates(WEEKLY_TEMPLATES, tctx, g.weeklyCount, `weekly:${ws}`, g.rarityWeights, { minRarity: 'uncommon' });
     out.push(...picked.map((p) => goalQuest(p, 'weekly', ctx, { date: ws, endDate: weekEnd(ctx.date) })));
