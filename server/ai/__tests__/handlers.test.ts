@@ -173,6 +173,40 @@ describe('serverless AI API', () => {
     expect((await e.json()).error.kind).toBe('image');
   });
 
+  it('food: the schema has no length/range limits, a rejected schema falls back to prompt-JSON, and the reply is normalised', async () => {
+    const reply = { isFood: true, mealName: 'Pasta al pomodoro con basilico fresco e parmigiano grattugiato abbondante', foods: [{ name: 'Pasta', estimatedQuantity: '120', unit: 'grams', calories: 430, protein: 15, carbs: 86, fat: 2, confidence: 'HIGH', cookingMethod: 'al dente' }, { name: '', calories: 10 }], overallConfidence: 'medium', questions: [{ text: 'Olio?', options: ['No'] }] };
+    const { factory, calls } = fakeClient({
+      generateContent: async (p) => {
+        if ((p.config as Record<string, unknown>).responseJsonSchema) throw apiError(400, '{"error":{"code":400,"message":"The specified schema produces a constraint that has too many states for serving.","status":"INVALID_ARGUMENT"}}');
+        return { text: '```json\n' + JSON.stringify(reply) + '\n```' };
+      },
+    });
+    const res = await handleFood(post('/api/food', { mode: 'analyze', image: { mimeType: 'image/jpeg', data: 'a'.repeat(500) } }), factory);
+    const r = await res.json();
+    expect(res.status).toBe(200);
+    const first = calls[0] as { config: { responseJsonSchema: object } };
+    expect(JSON.stringify(first.config.responseJsonSchema)).not.toMatch(/maxLength|minimum|maxItems/);
+    const second = calls[1] as { model: string; config: { responseJsonSchema?: object; systemInstruction: string } };
+    expect(second.model).toBe((calls[0] as { model: string }).model); // same model, no quota wasted elsewhere
+    expect(second.config.responseJsonSchema).toBeUndefined();
+    expect(second.config.systemInstruction).toMatch(/JSON Schema/);
+    expect(r.estimate.foods).toHaveLength(1);
+    expect(r.estimate.foods[0]).toMatchObject({ name: 'Pasta', estimatedQuantity: 120, unit: 'g', confidence: 'high', cookingMethod: 'unknown' });
+    expect(r.estimate.mealName.length).toBeLessThanOrEqual(60);
+    expect(r.estimate.questions).toEqual([]);
+    expect(logs.some((l) => l.evt === 'ai_schema_fallback')).toBe(true);
+  });
+
+  it("a request Google rejects shows Google's own reason (keys scrubbed)", async () => {
+    const { factory } = fakeClient({ generateContent: async () => { throw apiError(400, '{"error":{"code":400,"message":"Request contains an invalid argument. key=AIzaSyABCDEFGHIJKLMNOP","status":"INVALID_ARGUMENT"}}'); } });
+    const res = await handleFood(post('/api/food', { mode: 'analyze', image: { mimeType: 'image/jpeg', data: 'a'.repeat(500) } }), factory);
+    const r = await res.json();
+    expect(res.status).toBe(400);
+    expect(r.error.kind).toBe('bad_request');
+    expect(r.error.message).toMatch(/Google said: “Request contains an invalid argument/);
+    expect(r.error.message).not.toMatch(/AIza/);
+  });
+
   it('GET /api/models lists discovered models with capabilities, Free Tier status, routes and health', async () => {
     const { factory } = fakeClient();
     const m = await (await handleModels(new Request('http://x/api/models'), factory)).json();

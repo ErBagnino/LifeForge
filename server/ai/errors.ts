@@ -85,3 +85,27 @@ export function quotaDetail(err: unknown): QuotaDetail {
   }
   return out;
 }
+
+/**
+ * Google's own one-line reason for a rejected request (e.g. a 400 INVALID_ARGUMENT), so the
+ * player sees *why* instead of a generic "not valid". Keys and URLs are scrubbed; never content.
+ */
+export function googleReason(err: unknown): string | undefined {
+  const msg = String((err as { message?: string })?.message ?? '');
+  if (!msg) return undefined;
+  const inner = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(msg)?.[1];
+  const text = (inner ? inner.replace(/\\"/g, '"').replace(/\\n/g, ' ') : msg)
+    .replace(/AIza[0-9A-Za-z_-]{10,}/g, '[key]')
+    .replace(/key=[^&\s"]+/gi, 'key=[key]')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return undefined;
+  return text.length > 180 ? `${text.slice(0, 177)}…` : text;
+}
+
+/** A 400 caused by the request itself (not the key, the quota or the image). */
+export function isPayloadRejection(err: unknown): boolean {
+  const status = (err as { status?: number })?.status;
+  return status === 400 && classifyError(err, 'chat') === 'bad_request';
+}

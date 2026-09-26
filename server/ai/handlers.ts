@@ -1,11 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
 import { classifyCoachText } from '../../src/ai/shared/classify.js';
-import { FoodEstimateSchema, FoodRequestSchema, sumFoods } from '../../src/ai/shared/food.js';
+import { coerceEstimate, FoodEstimateSchema, FoodRequestSchema, sumFoods } from '../../src/ai/shared/food.js';
 import { type ModelsResponse, type ModelView, type RequestType, ROUTES, type RoutingInfo, type RoutingPrefs, RoutingPrefsSchema } from '../../src/ai/shared/models.js';
 import { ChatRequestSchema, TOOL_DEFS, cleanSchema, toolJsonSchema } from '../../src/ai/shared/tools.js';
 import { z } from 'zod';
 import { allowPaid, geminiKey, geminiModel, LIMITS } from './config.js';
-import { AiFailure, classifyError, ERROR_MESSAGES, ERROR_STATUS, quotaDetail, type AiErrorKind } from './errors.js';
+import { AiFailure, classifyError, ERROR_MESSAGES, ERROR_STATUS, googleReason, isPayloadRejection, quotaDetail, type AiErrorKind } from './errors.js';
 import { RouterError, runRouted, sanitizeSignatures } from './execute.js';
 import { coachSystem, foodSystem, reviseInstruction } from './prompts.js';
 import { discoverModels, type ModelLister, type RawModel, type RegistryModel } from './registry.js';
@@ -43,14 +43,23 @@ export function errorResponse(kind: AiErrorKind, message?: string, extra: Record
   return json({ error: { kind, message: message ?? ERROR_MESSAGES[kind], ...extra } }, ERROR_STATUS[kind]);
 }
 
+/** For rejected requests, add Google's own reason so the problem is visible (and reportable). */
+function withReason(kind: AiErrorKind, cause: unknown): string | undefined {
+  if (kind !== 'bad_request' && kind !== 'image') return undefined;
+  const reason = googleReason(cause);
+  if (!reason) return undefined;
+  logger({ evt: 'ai_rejected', kind, reason });
+  return `${ERROR_MESSAGES[kind]} Google said: “${reason}”`;
+}
+
 function failure(e: unknown, context: 'chat' | 'food'): Response {
   if (e instanceof RouterError) {
     const kind: AiErrorKind = e.kind;
     const last = [...e.attempts].reverse().find((a) => a.quota);
-    return errorResponse(kind, undefined, { routing: { attempts: e.attempts, retryAt: e.retryAt }, ...(last?.quota ? { quota: last.quota } : {}) });
+    return errorResponse(kind, withReason(kind, e.cause), { routing: { attempts: e.attempts, retryAt: e.retryAt }, ...(last?.quota ? { quota: last.quota } : {}) });
   }
   const kind = classifyError(e, context);
-  return errorResponse(kind, undefined, kind === 'quota' ? { quota: quotaDetail(e) } : {});
+  return errorResponse(kind, withReason(kind, e), kind === 'quota' ? { quota: quotaDetail(e) } : {});
 }
 
 const usageOf = (u?: GenerateResult['usageMetadata']) =>
@@ -174,7 +183,36 @@ export async function handleChat(req: Request, factory: ClientFactory = defaultF
   }
 }
 
-const ESTIMATE_JSON_SCHEMA = cleanSchema(z.toJSONSchema(FoodEstimateSchema, { io: 'input' }));
+/**
+ * The schema Gemini gets for structured output: types, enums, required fields and descriptions
+ * only. Length / range / item-count limits make Google's constrained decoder reject the schema
+ * ("too many states"), so they are enforced afterwards by coerceEstimate() + zod instead.
+ */
+const LIMIT_KEYS = new Set(['minLength', 'maxLength', 'minimum', 'maximum', 'minItems', 'maxItems', 'exclusiveMinimum', 'exclusiveMaximum']);
+function modelSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(modelSchema);
+  if (!node || typeof node !== 'object') return node;
+  return Object.fromEntries(Object.entries(node).filter(([k]) => !LIMIT_KEYS.has(k)).map(([k, v]) => [k, typeof v === 'object' ? modelSchema(v) : v]));
+}
+export const ESTIMATE_JSON_SCHEMA = modelSchema(cleanSchema(z.toJSONSchema(FoodEstimateSchema, { io: 'input' }))) as Record<string, unknown>;
+const SCHEMA_IN_PROMPT = `Reply with ONE JSON object only (no markdown) matching this JSON Schema:\n${JSON.stringify(ESTIMATE_JSON_SCHEMA)}`;
+
+const stripFences = (t: string) => t.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+
+/**
+ * Structured output with a safety net: if Google rejects the request itself (HTTP 400 that
+ * is not the key, quota or image), retry the SAME model once with the schema in the prompt
+ * instead of responseJsonSchema. The reply is validated by zod either way.
+ */
+async function structuredCall<R>(model: string, run: (schemaMode: boolean) => Promise<R>): Promise<R> {
+  try {
+    return await run(true);
+  } catch (e) {
+    if (!isPayloadRejection(e)) throw e;
+    logger({ evt: 'ai_schema_fallback', model, reason: googleReason(e) });
+    return run(false);
+  }
+}
 
 /** POST /api/food — analyze a photo, revise an estimate, or explain it. Images are never stored or logged. */
 export async function handleFood(req: Request, factory: ClientFactory = defaultFactory): Promise<Response> {
@@ -210,25 +248,27 @@ export async function handleFood(req: Request, factory: ClientFactory = defaultF
         : [{ text: `${reviseInstruction()}\n\nPrevious estimate (JSON): ${JSON.stringify(body.estimate)}\n\nUser: ${body.message}\n\n${lang}` }];
 
     const { result: res, model, routing } = await routed(client, requestType, prefs, body.mode === 'analyze' ? 2500 : 2000, 'food', (m) =>
-      client.models.generateContent({
-        model: m.id,
-        contents: [{ role: 'user', parts }],
-        config: {
-          systemInstruction: foodSystem(),
-          responseMimeType: 'application/json',
-          responseJsonSchema: ESTIMATE_JSON_SCHEMA,
-          temperature: 0.2,
-          maxOutputTokens: LIMITS.maxOutputTokensFood,
-        },
-      }),
+      structuredCall(m.id, (schemaMode) =>
+        client.models.generateContent({
+          model: m.id,
+          contents: [{ role: 'user', parts }],
+          config: {
+            systemInstruction: schemaMode ? foodSystem() : `${foodSystem()}\n${SCHEMA_IN_PROMPT}`,
+            responseMimeType: 'application/json',
+            ...(schemaMode ? { responseJsonSchema: ESTIMATE_JSON_SCHEMA } : {}),
+            temperature: 0.2,
+            maxOutputTokens: LIMITS.maxOutputTokensFood,
+          },
+        }),
+      ),
     );
     let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(res.text ?? '');
+      parsedJson = JSON.parse(stripFences(res.text ?? ''));
     } catch {
       return errorResponse('image', 'The estimate came back in an unexpected format. Try again or add the meal manually.', { usage: usageOf(res.usageMetadata), routing });
     }
-    const estimate = FoodEstimateSchema.safeParse(parsedJson);
+    const estimate = FoodEstimateSchema.safeParse(coerceEstimate(parsedJson));
     if (!estimate.success) return errorResponse('image', 'The estimate came back in an unexpected format. Try again or add the meal manually.', { routing });
     // Totals are recomputed from the items; the model's own sum is not trusted.
     const out = { estimate: { ...estimate.data, mealTotals: sumFoods(estimate.data.foods) }, model: model.id, usage: usageOf(res.usageMetadata), routing };

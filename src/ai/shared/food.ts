@@ -79,3 +79,72 @@ export const FoodRequestSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 export type FoodRequest = z.infer<typeof FoodRequestSchema>;
+
+// ——— Tolerant normalisation of the model's reply (limits are enforced here, not in the schema) ———
+
+const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : typeof v === 'number' ? String(v).slice(0, max) : undefined);
+const num = (v: unknown, max: number): number => {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v.replace(',', '.')) : NaN;
+  return Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0;
+};
+const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => {
+  const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  return (allowed as readonly string[]).includes(s) ? (s as T) : fallback;
+};
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+
+/**
+ * Bring a model reply into FoodEstimateSchema's bounds: clamp numbers, trim strings, cap list
+ * lengths, map unknown enum values to safe defaults and drop items without a name. It never
+ * invents foods or values; an empty or non-object reply stays invalid and is rejected by zod.
+ */
+export function coerceEstimate(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const r = raw as Record<string, unknown>;
+  const foods = list(r.foods)
+    .map(obj)
+    .map((f) => {
+      const name = str(f.name, 60);
+      if (!name) return undefined;
+      const note = str(f.note, 120);
+      return {
+        name,
+        estimatedQuantity: num(f.estimatedQuantity, 3000),
+        unit: pick(f.unit, FOOD_UNITS, 'g'),
+        calories: num(f.calories, 5000),
+        protein: num(f.protein, 400),
+        carbs: num(f.carbs, 800),
+        fat: num(f.fat, 400),
+        confidence: pick(f.confidence, CONFIDENCE, 'medium'),
+        cookingMethod: pick(f.cookingMethod, COOKING_METHODS, 'unknown'),
+        ...(note ? { note } : {}),
+      };
+    })
+    .filter((f): f is NonNullable<typeof f> => !!f)
+    .slice(0, 15);
+  const questions = list(r.questions)
+    .map(obj)
+    .map((q, i) => {
+      const text = str(q.text, 140);
+      const options = list(q.options).map((o) => str(o, 24)).filter((o): o is string => !!o).slice(0, 5);
+      return text && options.length >= 2 ? { id: str(q.id, 30) ?? `q${i + 1}`, text, options } : undefined;
+    })
+    .filter((q): q is NonNullable<typeof q> => !!q)
+    .slice(0, 3);
+  const strings = (v: unknown, n: number) => list(v).map((s) => str(s, 140)).filter((s): s is string => !!s).slice(0, n);
+  const plateContext = str(r.plateContext, 140);
+  const changeSummary = str(r.changeSummary, 200);
+  return {
+    isFood: typeof r.isFood === 'boolean' ? r.isFood : foods.length > 0,
+    mealName: str(r.mealName, 60) ?? foods[0]?.name ?? '',
+    foods,
+    mealTotals: sumFoods(foods),
+    overallConfidence: pick(r.overallConfidence, CONFIDENCE, 'medium'),
+    ...(plateContext ? { plateContext } : {}),
+    assumptions: strings(r.assumptions, 8),
+    unknowns: strings(r.unknowns, 6),
+    questions,
+    ...(changeSummary ? { changeSummary } : {}),
+  };
+}

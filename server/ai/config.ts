@@ -32,5 +32,5 @@ export const LIMITS = {
   chatBodyBytes: 3_000_000,
   foodBodyBytes: 4_200_000,
   maxOutputTokensChat: 2048,
-  maxOutputTokensFood: 2048,
+  maxOutputTokensFood: 8192,
 };
