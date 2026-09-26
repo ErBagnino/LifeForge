@@ -15,6 +15,14 @@ export function geminiKey(): string | undefined {
   return k ? k : undefined;
 }
 
+/**
+ * Paid models can only ever be used when this is explicitly "true" on the server AND
+ * the player turned FREE TIER ONLY off in the app. Default: never.
+ */
+export function allowPaid(): boolean {
+  return process.env.GEMINI_ALLOW_PAID?.trim().toLowerCase() === 'true';
+}
+
 export function geminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 }

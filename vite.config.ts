@@ -20,7 +20,7 @@ function devApi(): Plugin {
       for (const k of ['GEMINI_API_KEY', 'GEMINI_MODEL']) if (env[k] && !process.env[k]) process.env[k] = env[k];
       server.middlewares.use(async (req, res, next) => {
         const route = req.url?.split('?')[0];
-        if (!route || !['/api/ai', '/api/food', '/api/status'].includes(route)) return next();
+        if (!route || !['/api/ai', '/api/food', '/api/status', '/api/models'].includes(route)) return next();
         try {
           const mod = await server.ssrLoadModule('/server/ai/handlers.ts');
           const chunks: Buffer[] = [];
@@ -30,7 +30,7 @@ function devApi(): Plugin {
             headers: req.headers as Record<string, string>,
             body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
           });
-          const handler = route === '/api/ai' ? mod.handleChat : route === '/api/food' ? mod.handleFood : mod.handleStatus;
+          const handler = route === '/api/ai' ? mod.handleChat : route === '/api/food' ? mod.handleFood : route === '/api/models' ? mod.handleModels : mod.handleStatus;
           const response: Response = await handler(request);
           res.statusCode = response.status;
           response.headers.forEach((v, k) => res.setHeader(k, v));

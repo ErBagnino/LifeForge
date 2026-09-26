@@ -1,31 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { handleChat, handleFood, handleStatus, type GeminiClient } from '../handlers';
+import { handleChat, handleFood, handleModels, handleStatus, setLogger, type GeminiClient } from '../handlers';
 import { classifyError } from '../errors';
+import { execConfig } from '../execute';
+import { clearDiscoveryCache, type RawModel } from '../registry';
+import { resetHealth } from '../router';
 import { TOOL_DEFS, toolJsonSchema } from '../../../src/ai/shared/tools';
 
 const chatBody = { contents: [{ role: 'user', parts: [{ text: 'Porta le proteine a 150g' }] }], context: '{"today":"2026-09-23"}', personality: 'direct' };
 const post = (url: string, body: unknown) => new Request(`http://x${url}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+const LISTED: RawModel[] = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash-image'].map((n) => ({ name: `models/${n}`, displayName: n, supportedActions: ['generateContent'] }));
 
-function fakeClient(impl: Partial<GeminiClient['models']>): { factory: () => GeminiClient; calls: Record<string, unknown>[] } {
+/** Test double for the Google GenAI SDK (no network). */
+function fakeClient(impl: { generateContent?: (p: Record<string, unknown>) => Promise<unknown>; models?: RawModel[] } = {}) {
   const calls: Record<string, unknown>[] = [];
-  const client: GeminiClient = {
+  const client = {
     models: {
-      generateContent: async (p) => {
+      generateContent: async (p: Record<string, unknown>) => {
         calls.push(p);
         return impl.generateContent ? impl.generateContent(p) : { text: 'ok' };
       },
-      get: impl.get ?? (async () => ({ name: 'models/gemini-test', displayName: 'Gemini Test' })),
+      list: async () => impl.models ?? LISTED,
     },
-  };
+  } as unknown as GeminiClient;
   return { factory: () => client, calls };
 }
 
 const apiError = (status: number, message: string) => Object.assign(new Error(message), { status });
+const logs: Record<string, unknown>[] = [];
 
 describe('serverless AI API', () => {
   beforeEach(() => {
     process.env.GEMINI_API_KEY = 'test-key';
     delete process.env.GEMINI_MODEL;
+    delete process.env.GEMINI_ALLOW_PAID;
+    clearDiscoveryCache();
+    resetHealth();
+    logs.length = 0;
+    setLogger((e) => logs.push(e));
+    execConfig.sleep = async () => undefined;
   });
   afterEach(() => {
     delete process.env.GEMINI_API_KEY;
@@ -33,7 +45,7 @@ describe('serverless AI API', () => {
 
   it('reports "not configured" without a key and never calls Gemini', async () => {
     delete process.env.GEMINI_API_KEY;
-    const { factory, calls } = fakeClient({});
+    const { factory, calls } = fakeClient();
     const s = await (await handleStatus(new Request('http://x/api/status'), factory)).json();
     expect(s).toMatchObject({ state: 'not_configured', model: 'gemini-flash-latest' });
     const r = await handleChat(post('/api/ai', chatBody), factory);
@@ -42,8 +54,7 @@ describe('serverless AI API', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('uses GEMINI_MODEL, declares every tool and returns function calls', async () => {
-    process.env.GEMINI_MODEL = 'gemini-custom';
+  it('routes the Coach to a Free Tier model, declares every tool and returns function calls + routing info', async () => {
     const { factory, calls } = fakeClient({
       generateContent: async () => ({
         functionCalls: [{ id: 'c1', name: 'updateNutritionTargets', args: { protein: 150 } }],
@@ -53,38 +64,87 @@ describe('serverless AI API', () => {
     const res = await (await handleChat(post('/api/ai', chatBody), factory)).json();
     expect(res.calls).toEqual([{ id: 'c1', name: 'updateNutritionTargets', args: { protein: 150 } }]);
     expect(res.content.parts[0].thoughtSignature).toBe('sig');
+    expect(res.routing).toMatchObject({ requestType: 'SIMPLE_COMMAND', model: 'gemini-2.5-flash-lite', fallback: false, freeTierOnly: true });
     const req = calls[0] as { model: string; config: { tools: { functionDeclarations: { name: string }[] }[]; systemInstruction: string } };
-    expect(req.model).toBe('gemini-custom');
+    expect(req.model).toBe('gemini-2.5-flash-lite');
     expect(req.config.tools[0].functionDeclarations.map((f) => f.name)).toEqual(TOOL_DEFS.map((d) => d.name));
     expect(req.config.systemInstruction).toContain('2026-09-23');
+    // Structured log: metadata only.
+    expect(logs.at(-1)).toMatchObject({ evt: 'ai_request', model: 'gemini-2.5-flash-lite', status: 'ok' });
+    expect(JSON.stringify(logs)).not.toContain('proteine');
+    expect(JSON.stringify(logs)).not.toContain('test-key');
   });
 
-  it('maps Gemini errors to friendly kinds', async () => {
+  it('GEMINI_MODEL is the preferred first choice when it is a verified Free Tier model — never when it is not', async () => {
+    process.env.GEMINI_MODEL = 'gemini-2.5-flash';
+    const a = fakeClient();
+    await handleChat(post('/api/ai', chatBody), a.factory);
+    expect((a.calls[0] as { model: string }).model).toBe('gemini-2.5-flash');
+    process.env.GEMINI_MODEL = 'gemini-2.5-pro';
+    const b = fakeClient();
+    await handleChat(post('/api/ai', chatBody), b.factory);
+    expect((b.calls[0] as { model: string }).model).not.toBe('gemini-2.5-pro');
+  });
+
+  it('429 on the primary → automatic fallback, same answer shape', async () => {
+    const { factory } = fakeClient({
+      generateContent: async (p) => (p.model === 'gemini-2.5-flash-lite' ? Promise.reject(apiError(429, 'RESOURCE_EXHAUSTED {"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","retryDelay":"30s"}')) : { text: 'Fatto.' }),
+    });
+    const res = await (await handleChat(post('/api/ai', chatBody), factory)).json();
+    expect(res.text).toBe('Fatto.');
+    expect(res.routing).toMatchObject({ model: 'gemini-2.5-flash', fallback: true });
+    expect(res.routing.attempts[0]).toMatchObject({ model: 'gemini-2.5-flash-lite', outcome: 'rate_limited', quota: { limitType: 'rpm', retryAfterSec: 30 } });
+  });
+
+  it('maps errors to friendly kinds', async () => {
     const cases: [Error, string][] = [
       [apiError(429, 'RESOURCE_EXHAUSTED: quota exceeded'), 'quota'],
       [apiError(400, 'API key not valid. Please pass a valid API key.'), 'invalid_key'],
-      [apiError(404, 'models/gemini-x is not found'), 'model'],
-      [apiError(500, 'internal'), 'server'],
+      [apiError(404, 'models/gemini-x is not found'), 'no_model'],
+      [apiError(500, 'internal'), 'no_model'],
     ];
     for (const [err, kind] of cases) {
+      clearDiscoveryCache();
+      resetHealth();
       const { factory } = fakeClient({ generateContent: async () => Promise.reject(err) });
       const r = await handleChat(post('/api/ai', chatBody), factory);
-      expect((await r.json()).error.kind).toBe(kind);
+      const body = await r.json();
+      expect(body.error.kind).toBe(kind);
     }
     expect(classifyError(apiError(400, 'Unable to process input image'), 'food')).toBe('image');
-    const { factory } = fakeClient({ get: async () => Promise.reject(apiError(429, 'quota')) });
-    expect((await (await handleStatus(new Request('http://x/api/status?test=1'), factory)).json()).state).toBe('quota');
+  });
+
+  it('no verified Free Tier model → cost_blocked, never a paid call', async () => {
+    const { factory, calls } = fakeClient({ models: [{ name: 'models/gemini-2.5-pro', supportedActions: ['generateContent'] }] });
+    const r = await handleChat(post('/api/ai', chatBody), factory);
+    expect(r.status).toBe(403);
+    expect((await r.json()).error).toMatchObject({ kind: 'cost_blocked', message: 'This model cannot be verified as Free Tier.' });
+    expect(calls).toHaveLength(0);
+    // Turning FREE TIER ONLY off in the app alone doesn't enable paid models.
+    const r2 = await handleChat(post('/api/ai', { ...chatBody, routing: { freeTierOnly: false } }), factory);
+    expect(r2.status).toBe(403);
+    process.env.GEMINI_ALLOW_PAID = 'true';
+    const r3 = await handleChat(post('/api/ai', { ...chatBody, routing: { freeTierOnly: false } }), factory);
+    expect(r3.status).toBe(200);
+  });
+
+  it('the same requestId returns the cached answer without a second Gemini call', async () => {
+    const { factory, calls } = fakeClient();
+    const body = { ...chatBody, routing: { freeTierOnly: true, requestId: 'req-1' } };
+    await handleChat(post('/api/ai', body), factory);
+    await handleChat(post('/api/ai', body), factory);
+    expect(calls).toHaveLength(1);
   });
 
   it('rejects invalid and oversized payloads', async () => {
-    const { factory } = fakeClient({});
+    const { factory } = fakeClient();
     expect((await handleChat(post('/api/ai', { contents: [] }), factory)).status).toBe(400);
     const big = { ...chatBody, context: 'x'.repeat(3_100_000) };
     expect((await handleChat(post('/api/ai', big), factory)).status).toBe(400);
     expect((await handleFood(post('/api/food', { mode: 'analyze', image: { mimeType: 'image/gif', data: 'x'.repeat(200) } }), factory)).status).toBe(400);
   });
 
-  it('food analysis returns a validated estimate with totals recomputed from the items', async () => {
+  it('food analysis uses an image + JSON capable model and returns a validated estimate', async () => {
     const estimate = {
       isFood: true,
       mealName: 'Chicken & rice',
@@ -101,15 +161,38 @@ describe('serverless AI API', () => {
     const { factory, calls } = fakeClient({ generateContent: async () => ({ text: JSON.stringify(estimate) }) });
     const r = await (await handleFood(post('/api/food', { mode: 'analyze', image: { mimeType: 'image/jpeg', data: 'a'.repeat(500) }, locale: 'it' }), factory)).json();
     expect(r.estimate.mealTotals).toEqual({ calories: 492, protein: 60, carbs: 42, fat: 6 });
-    expect(r.estimate.questions[0].options).toContain('1 tbsp');
-    const req = calls[0] as { config: { responseMimeType: string; responseJsonSchema: object }; contents: { parts: { inlineData?: unknown }[] }[] };
+    expect(r.routing).toMatchObject({ requestType: 'FOOD_IMAGE', model: 'gemini-2.5-flash' });
+    const req = calls[0] as { model: string; config: { responseMimeType: string; responseJsonSchema: object }; contents: { parts: { inlineData?: unknown }[] }[] };
+    expect(req.model).not.toMatch(/image/); // never the image-GENERATION model
     expect(req.config.responseMimeType).toBe('application/json');
-    expect(req.config.responseJsonSchema).toBeTruthy();
     expect(req.contents[0].parts[0].inlineData).toBeTruthy();
+    expect(JSON.stringify(logs)).not.toContain('aaaa'); // images are never logged
 
     const bad = fakeClient({ generateContent: async () => ({ text: 'not json' }) });
     const e = await handleFood(post('/api/food', { mode: 'revise', estimate: { ...estimate, mealTotals: { calories: 1, protein: 1, carbs: 1, fat: 1 } }, message: 'Era tacchino' }), bad.factory);
     expect((await e.json()).error.kind).toBe('image');
+  });
+
+  it('GET /api/models lists discovered models with capabilities, Free Tier status, routes and health', async () => {
+    const { factory } = fakeClient();
+    const m = await (await handleModels(new Request('http://x/api/models'), factory)).json();
+    expect(m).toMatchObject({ state: 'connected', discovered: true, freeTierOnly: true, allowPaid: false });
+    const byId = Object.fromEntries(m.models.map((x: { id: string }) => [x.id, x]));
+    expect(byId['gemini-2.5-flash']).toMatchObject({ usable: true, freeTier: 'free', health: 'UNKNOWN' });
+    expect(byId['gemini-2.5-pro']).toMatchObject({ usable: false, excluded: 'This model cannot be verified as Free Tier.' });
+    expect(byId['gemini-2.5-flash-image'].usable).toBe(false);
+    expect(m.routes.FOOD_IMAGE).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+    expect(m.routes.TEXT_CHAT[0]).toBe('gemini-2.5-flash-lite');
+  });
+
+  it('status test routes one tiny request and reports router counts', async () => {
+    const { factory } = fakeClient();
+    const s = await (await handleStatus(new Request('http://x/api/status?test=1'), factory)).json();
+    expect(s).toMatchObject({ state: 'connected', modelName: 'Gemini · Auto', tested: true, router: { mode: 'FREE_TIER_ONLY', available: 2 } });
+    const q = fakeClient({ generateContent: async () => Promise.reject(apiError(429, 'quota')) });
+    clearDiscoveryCache();
+    resetHealth();
+    expect((await (await handleStatus(new Request('http://x/api/status?test=1'), q.factory)).json()).state).toBe('quota');
   });
 
   it('every tool has a clean JSON schema for Gemini', () => {

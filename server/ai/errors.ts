@@ -1,5 +1,5 @@
 /** Error kinds the app understands. Messages are safe to show to the user. */
-export type AiErrorKind = 'not_configured' | 'invalid_key' | 'quota' | 'model' | 'image' | 'bad_request' | 'server';
+export type AiErrorKind = 'not_configured' | 'invalid_key' | 'quota' | 'model' | 'image' | 'bad_request' | 'server' | 'no_model' | 'cost_blocked';
 
 export const ERROR_MESSAGES: Record<AiErrorKind, string> = {
   not_configured: 'Gemini is not connected yet. Add GEMINI_API_KEY in Vercel and redeploy.',
@@ -9,6 +9,8 @@ export const ERROR_MESSAGES: Record<AiErrorKind, string> = {
   image: "Couldn't analyze this image.",
   bad_request: 'The request was not valid.',
   server: 'AI service unavailable.',
+  no_model: 'Gemini is temporarily unavailable for this type of request.',
+  cost_blocked: 'This model cannot be verified as Free Tier.',
 };
 
 export const ERROR_STATUS: Record<AiErrorKind, number> = {
@@ -19,6 +21,8 @@ export const ERROR_STATUS: Record<AiErrorKind, number> = {
   image: 422,
   bad_request: 400,
   server: 502,
+  no_model: 503,
+  cost_blocked: 403,
 };
 
 export class AiFailure extends Error {
