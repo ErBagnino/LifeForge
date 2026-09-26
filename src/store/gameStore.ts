@@ -16,6 +16,7 @@ import { getLeisureTimer } from '@/services/metricsService';
 import { rescheduleReminders } from '@/services/notifications/reminderScheduler';
 import { ensureSeeded } from '@/services/seedService';
 import { pendingSuggestions, refreshSuggestions } from '@/services/suggestionService';
+import { contextSnapshot, recordOpen, type ContextSnapshot } from '@/services/contextService';
 import type { Building, DayLog, DayPlan, Player, Quest, Settings, Suggestion } from '@/types';
 
 export interface TodayState {
@@ -37,6 +38,8 @@ interface GameStore {
   today?: TodayState;
   suggestions: Suggestion[];
   leisureTimer?: LeisureTimer;
+  /** Daily context engine: state, time budget, focus, work session, opening card. */
+  context?: ContextSnapshot;
   /** Bumped after every mutation so history screens can refetch. */
   version: number;
   fx: GameEvent[];
@@ -83,6 +86,7 @@ export const useGame = create<GameStore>((set, get) => ({
         return;
       }
       const r = await ensureToday();
+      await recordOpen().catch(() => undefined);
       await get().refresh();
       set({ status: 'ready' });
       if (r.events.length) get().pushFx(...r.events);
@@ -110,7 +114,9 @@ export const useGame = create<GameStore>((set, get) => ({
       getLeisureTimer(),
     ]);
     const plan = settings ? await planFor(date, settings) : undefined;
+    const context = await contextSnapshot().catch(() => undefined);
     set((s) => ({
+      context,
       player,
       settings,
       buildings,
@@ -146,5 +152,5 @@ export const useGame = create<GameStore>((set, get) => ({
 export async function onResume(): Promise<void> {
   const { status, act } = useGame.getState();
   if (status !== 'ready') return;
-  await act(ensureToday());
+  await act(ensureToday().then(async (r) => (await recordOpen().catch(() => undefined), r)));
 }

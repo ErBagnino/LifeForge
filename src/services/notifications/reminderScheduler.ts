@@ -1,5 +1,7 @@
 import { learnTimes, reminderMinute } from '@/domain/habits';
-import { governReminders, planReminders, type PlannedReminder } from '@/domain/reminders';
+import { applyQuietWindows, governReminders, planReminders, type PlannedReminder, type QuietWindow } from '@/domain/reminders';
+import { expectedWork } from '@/domain/dailyContext';
+import { getOpenWork, learnedSchedule } from '../contextService';
 import { type LeisureTimer } from '@/domain/leisure';
 import {
   metaRepository,
@@ -8,6 +10,7 @@ import {
   questRepository,
   settingsRepository,
   statsRepository,
+  workoutRepository,
 } from '@/repositories';
 import { hmToMinutes, isWeekend, minuteOfDay, shiftDate } from '@/utils/date';
 import { uid } from '@/utils/id';
@@ -55,9 +58,10 @@ export async function planToday(): Promise<PlannedReminder[]> {
     planFor(today, settings),
     questRepository.byRange(shiftDate(today, -45), shiftDate(today, -1)),
   ]);
+  const since = settings.routine.learnedSince ?? 0;
   const learned = learnTimes(
     history
-      .filter((q) => q.status === 'completed' && q.activityId && q.completedAt)
+      .filter((q) => settings.routine.adaptive && q.status === 'completed' && q.activityId && q.completedAt && q.completedAt >= since)
       .map((q) => ({ activityId: q.activityId!, minute: q.actualTime ? hmToMinutes(q.actualTime) : minuteOfDay(q.completedAt!), weekend: isWeekend(q.date) })),
   );
   const learnedMinute: Record<string, number> = {};
@@ -80,6 +84,19 @@ export async function planToday(): Promise<PlannedReminder[]> {
     streak: player.streak.current,
   });
   planned.push(...(await leisureReminders(now)));
+  // Respect the daily context: no nudges at work, during a workout, or while playing.
+  const windows: QuietWindow[] = [];
+  const work = await getOpenWork();
+  if (work) {
+    const learned = await learnedSchedule();
+    const typical = expectedWork(learned, today)?.minutes ?? learned.work.avgMinutes ?? 9 * 60;
+    windows.push({ from: work.start, to: Math.max(now + 30 * 60_000, work.start + typical * 60_000), reason: 'work' });
+  }
+  if (await workoutRepository.activeSession()) windows.push({ from: now, to: now + 120 * 60_000, reason: 'training' });
+  if (await metaRepository.get<LeisureTimer>('leisureTimer')) windows.push({ from: now, to: now + 60 * 60_000, allow: ['leisure'], reason: 'play' });
+  const quiet = applyQuietWindows(planned, windows);
+  planned.length = 0;
+  planned.push(...quiet);
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const sent = await notificationRepository.between(dayStart, dayStart + 86400000);
   return governReminders(planned, sent, settings.notifications);

@@ -4,6 +4,8 @@ import { formatDate } from '@/utils/date';
 import { clock } from '../clock';
 import { planFor } from '../game/dayPlan';
 import { loadDay } from '../game/questService';
+import { contextSnapshot } from '../contextService';
+import { dailyContextSummary } from './dailyContextSummary';
 
 /**
  * Compact snapshot of the game sent with every Coach request. Short on purpose:
@@ -18,7 +20,9 @@ export async function buildContext(): Promise<string> {
   const sum = (t: string) => Math.round(entries.filter((e) => e.type === t).reduce((x, e) => x + e.value, 0));
   const work = workFromPlan(plan);
   const pending = day.filter((q) => q.status === 'pending');
+  const daily = await contextSnapshot().catch(() => undefined);
   const ctx = {
+    dailyContext: daily ? dailyContextSummary(daily) : 'unknown',
     now: { date: today, weekday: formatDate(today, 'EEEE'), time: new Date(clock.now()).toTimeString().slice(0, 5) },
     player: { name: s.profile.nickname || p.name, level: p.level, coins: p.coins, hp: p.hp, energy: `${p.energy}/${p.maxEnergy}`, streak: p.streak.current },
     today: {

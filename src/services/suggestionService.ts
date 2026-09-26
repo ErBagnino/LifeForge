@@ -78,9 +78,13 @@ export async function refreshSuggestions(): Promise<void> {
     }
   }
 
+  // Adaptive schedule: proposals only (never silent changes), only when enabled,
+  // and only from events after the last "Reset learned schedule".
+  if (!settings.routine.adaptive) return;
+  const since = settings.routine.learnedSince ?? 0;
   const recent = await questRepository.byRange(shiftDate(today, -45), today);
   const samples = recent
-    .filter((q) => q.status === 'completed' && q.activityId && q.completedAt)
+    .filter((q) => q.status === 'completed' && q.activityId && q.completedAt && q.completedAt >= since)
     .map((q) => ({ activityId: q.activityId!, minute: q.actualTime ? hmToMinutes(q.actualTime) : minuteOfDay(q.completedAt!), weekend: isWeekend(q.date) }));
   const activities = await activityRepository.all();
   const learned = learnTimes(samples);

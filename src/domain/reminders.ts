@@ -124,3 +124,17 @@ export function governReminders(
   }
   return accepted.sort((a, b) => a.at - b.at);
 }
+
+/** A period in which reminders must stay quiet (work, a workout, play time). */
+export interface QuietWindow {
+  from: number;
+  to: number;
+  /** Reminder types still allowed (e.g. the play-time budget warnings). */
+  allow?: NotificationType[];
+  reason: 'work' | 'training' | 'play';
+}
+
+/** Drop reminders that would fire inside a quiet window — context first, notifications second. */
+export function applyQuietWindows(planned: PlannedReminder[], windows: QuietWindow[]): PlannedReminder[] {
+  return planned.filter((r) => !windows.some((w) => r.at >= w.from && r.at < w.to && !(w.allow ?? []).includes(r.type)));
+}

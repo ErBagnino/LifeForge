@@ -8,6 +8,7 @@ import type {
   Building,
   Cosmetic,
   CounterEntry,
+  DailyContext,
   DayLog,
   DayPlan,
   Exercise,
@@ -60,6 +61,7 @@ export class LifeForgeDB extends Dexie {
   meals!: Table<Meal, string>;
   aiUsage!: Table<AiUsageRecord, string>;
   aiChanges!: Table<AiChange, string>;
+  dayContexts!: Table<DailyContext, string>;
 
   constructor(name: string = APP_CONFIG.dbName) {
     super(name);
@@ -97,6 +99,10 @@ export class LifeForgeDB extends Dexie {
     this.version(3).stores({
       aiUsage: 'id, ts, type',
       aiChanges: 'id, ts',
+    });
+    // v4: daily context (wake-up, work sessions) for the adaptive day engine.
+    this.version(4).stores({
+      dayContexts: 'date',
     });
   }
 }
@@ -148,5 +154,6 @@ export const TABLE_NAMES = [
   'meals',
   'aiUsage',
   'aiChanges',
+  'dayContexts',
 ] as const;
 export type TableName = (typeof TABLE_NAMES)[number];

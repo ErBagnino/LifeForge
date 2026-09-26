@@ -65,11 +65,14 @@ async function doEnsureToday(): Promise<ServiceResult> {
   return { events };
 }
 
-async function learnedWorkoutTime(date: ISODate): Promise<number | undefined> {
+async function learnedWorkoutTime(date: ISODate, settings: Settings): Promise<number | undefined> {
+  // Adaptive schedule off → manual/planned times only.
+  if (!settings.routine.adaptive) return undefined;
+  const since = settings.routine.learnedSince ?? 0;
   const recent = await questRepository.byRange(shiftDate(date, -60), shiftDate(date, -1));
   const samples = recent
-    .filter((q) => q.kind === 'workout' && q.status === 'completed' && q.completedAt)
-    .map((q) => ({ activityId: 'workout', minute: hmToMinutes(q.actualTime ?? minutesToHm(new Date(q.completedAt!).getHours() * 60)), weekend: isWeekend(q.date) }));
+    .filter((q) => q.kind === 'workout' && q.status === 'completed' && q.completedAt && q.completedAt >= since)
+    .map((q) => ({ activityId: 'workout', minute: hmToMinutes(q.actualTime ?? minutesToHm(new Date(q.completedAt!).getHours() * 60 + new Date(q.completedAt!).getMinutes())), weekend: isWeekend(q.date) }));
   const learned = learnTimes(samples)[0];
   if (!learned) return undefined;
   return (isWeekend(date) ? learned.weekendMedian : learned.weekdayMedian) ?? learned.median;
@@ -174,7 +177,7 @@ export async function startDay(date: ISODate, opts: { regenerate?: boolean } = {
     }
 
     if (template && workoutToday && !existing.day.some((q) => q.kind === 'workout')) {
-      const learned = await learnedWorkoutTime(date);
+      const learned = await learnedWorkoutTime(date, settings);
       const wq = workoutQuest(template, ctx, learned !== undefined ? minutesToHm(Math.round(learned / 15) * 15) : defaultWorkoutTime(plan));
       if (!fixedTemplate) Object.assign(wq, { tier: 'important' as const, reason: 'Flexible plan: train today if it fits your day.' });
       created.push(wq);

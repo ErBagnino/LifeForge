@@ -1,3 +1,4 @@
+import { WorkStatsCard } from './WorkStatsCard';
 import { useNavigate } from 'react-router';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { Screen } from '@/components/layout/Screen';
@@ -54,6 +55,8 @@ export default function StatsScreen() {
       <SectionTitle>Last 14 days</SectionTitle>
       <ChartCard title="Today Score" data={series ?? []} xKey="label" series={[{ key: 'score', label: 'Score', color: 'var(--lf-accent)' }]} kind="bar" reference={{ y: 70, label: 'streak line' }} />
       <ChartCard title="XP earned" data={series ?? []} xKey="label" series={[{ key: 'xp', label: 'XP', color: 'var(--lf-xp)' }]} kind="bar" />
+
+      <WorkStatsCard />
 
       <List title="Dig deeper">
         <Row icon="📅" title="Calendar" subtitle="Every day, with history" onClick={() => navigate('/stats/calendar')} />

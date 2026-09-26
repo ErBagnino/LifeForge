@@ -29,6 +29,10 @@ import { SuggestionCards } from './SuggestionCards';
 import { Timeline } from './Timeline';
 import { WorkNudge } from './WorkNudge';
 import { NutritionGlance, StatsGlance } from './TodayExtras';
+import { ContextChip } from './context/ContextChip';
+import { DailyOpeningCard } from './context/DailyOpeningCard';
+import { FocusCard } from './context/FocusCard';
+import { PostWorkSheet, useEndWork, WorkModeView, WorkStartCard } from './context/Work';
 
 
 function groupQuests(all: Quest[], routines: Routine[]) {
@@ -65,6 +69,9 @@ export default function TodayScreen() {
   const [sheet, setSheet] = useState<Quest | null>(null);
   const [quick, setQuick] = useState<{ open: boolean; tab: QuickTab }>({ open: false, tab: 'water' });
   const [dayOpen, setDayOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const context = useGame((s) => s.context);
+  const endFlow = useEndWork();
 
   const date = today?.date ?? clock.today();
   const { data: streaks } = useAsync(async () => {
@@ -117,6 +124,7 @@ export default function TodayScreen() {
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-muted">{formatDate(date, 'EEEE d MMMM')}</div>
           <h1 className="text-[28px] leading-tight font-extrabold tracking-tight">{ramp?.label ? `Day ${dayIndex + 1}` : 'Today'}</h1>
+          <ContextChip />
         </div>
         <button type="button" onClick={() => setDayOpen(true)} className="flex min-h-11 shrink-0 flex-col items-end justify-center gap-1" aria-label="Today setup">
           <Chip icon={dayLabel.icon}>
@@ -129,6 +137,27 @@ export default function TodayScreen() {
         </button>
       </div>
       <p className="mt-1 text-[15px] text-muted">{line}</p>
+      {context?.openWork && !showAll ? (
+        <>
+          <WorkModeView onEnd={() => void endFlow.end()} onShowAll={() => setShowAll(true)} />
+          <PostWorkSheet open={endFlow.post.open} minutes={endFlow.post.minutes} onClose={endFlow.close} />
+        </>
+      ) : (
+        <>
+      {context?.openWork && (
+        <Card className="mt-3 !py-3">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 text-[14px] font-semibold">💼 Work session running — quests are on hold.</span>
+            <Button size="sm" variant="secondary" onClick={() => setShowAll(false)}>
+              Work Mode
+            </Button>
+            <Button size="sm" onClick={() => void endFlow.end()}>
+              END WORK
+            </Button>
+          </div>
+        </Card>
+      )}
+      <DailyOpeningCard />
       {player.recoveryMode && (
         <div className="mt-3 rounded-3xl bg-hp/10 p-4 text-[14px] text-hp">
           <span className="font-bold">🩹 Recovery Mode.</span> Essentials only, penalties softened, HP heals faster. Get HP back to {settings.rules.hp.recoveryExit} to exit.
@@ -148,6 +177,7 @@ export default function TodayScreen() {
       )}
 
       <WorkNudge date={date} workStatus={workStatus} dayIndex={dayIndex} onSetup={() => setDayOpen(true)} />
+      <WorkStartCard />
 
       {firstPending && (
         <Card className="mt-4 border-2 border-accent/40">
@@ -171,7 +201,7 @@ export default function TodayScreen() {
       )}
 
       <ScoreCard />
-      <NextActionCard onStart={start} onOpen={setSheet} />
+      {context && !context.openWork && (context.view.focus.length > 0 || context.view.state === 'SLEEP' || context.view.state === 'WIND_DOWN') ? <FocusCard onStart={start} onOpen={setSheet} /> : <NextActionCard onStart={start} onOpen={setSheet} />}
       <SuggestionCards />
 
       <div className="mt-5 flex items-center justify-between gap-2">
@@ -274,6 +304,9 @@ export default function TodayScreen() {
       <QuestSheet quest={sheet ? (today.quests.find((q) => q.id === sheet.id) ?? sheet) : null} onClose={() => setSheet(null)} onMetric={openMetric} />
       <QuickLogSheet open={quick.open} tab={quick.tab} onClose={() => setQuick((q) => ({ ...q, open: false }))} />
       <DaySheet open={dayOpen} onClose={() => setDayOpen(false)} />
+      <PostWorkSheet open={endFlow.post.open} minutes={endFlow.post.minutes} onClose={endFlow.close} />
+        </>
+      )}
     </Screen>
   );
 }

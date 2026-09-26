@@ -2,7 +2,7 @@ import type { DayPlan, Quest, Recurrence } from '@/types';
 import { dateTimeToTs, gameMinutes, minutesToHm, tsToHm } from '@/utils/date';
 import { activeBlock } from './workload';
 
-export type SnoozeKind = '30m' | '1h' | 'after_work' | 'tonight' | 'before_bed' | 'tomorrow';
+export type SnoozeKind = '30m' | '1h' | 'after_work' | 'after_dinner' | 'tonight' | 'before_bed' | 'tomorrow' | 'weekend';
 
 export interface SnoozeOption {
   kind: SnoozeKind;
@@ -10,6 +10,18 @@ export interface SnoozeOption {
   detail: string;
   /** Timestamp for same-day snoozes; undefined for "tomorrow" (a move). */
   until?: number;
+  /** Move the quest to this date (e.g. the weekend). */
+  moveTo?: string;
+}
+
+/** What the daily context knows (all optional): estimated work end, usual dinner, next Saturday. */
+export interface SnoozeContext {
+  /** Game minutes when work is expected to end (running timer or learned pattern). */
+  workEndMin?: number;
+  /** Learned usual dinner time (game minutes). */
+  dinnerMin?: number;
+  /** Next Saturday, offered for non-daily quests on weekdays. */
+  weekendDate?: string;
 }
 
 /** Smart snooze suggestions based on time, the work schedule and bedtime. */
@@ -20,6 +32,7 @@ export function snoozeOptions(
   plan: Pick<DayPlan, 'work' | 'busy' | 'sleep'>,
   recurrence: Recurrence | undefined,
   dayStartHour: number,
+  extra: SnoozeContext = {},
 ): SnoozeOption[] {
   const options: SnoozeOption[] = [];
   const bedtime = gameMinutes(plan.sleep, dayStartHour);
@@ -35,17 +48,20 @@ export function snoozeOptions(
   options.push({ kind: '1h', label: '1 hour', detail: tsToHm(now + 60 * 60000), until: now + 60 * 60000 });
 
   const block = activeBlock(plan, nowMin);
-  if (block && plan.work && block === plan.work) {
+  if (extra.workEndMin !== undefined && extra.workEndMin > nowGame) add('after_work', 'After work', extra.workEndMin + 15);
+  else if (block && plan.work && block === plan.work) {
     add('after_work', 'After work', gameMinutes(plan.work.end, dayStartHour) + 15);
   }
-  if (nowGame < 20 * 60) add('tonight', 'Tonight', 20 * 60 + 30);
+  if (extra.dinnerMin !== undefined && extra.dinnerMin + 45 > nowGame) add('after_dinner', 'After dinner', Math.round((extra.dinnerMin + 45) / 15) * 15);
+  else if (nowGame < 20 * 60) add('tonight', 'Tonight', 20 * 60 + 30);
   else add('before_bed', 'Before bed', bedtime - 45);
 
   if (!recurrence || recurrence.type !== 'daily') {
     options.push({ kind: 'tomorrow', label: 'Tomorrow', detail: 'Move to tomorrow' });
+    if (extra.weekendDate) options.push({ kind: 'weekend', label: 'Weekend', detail: 'Move to Saturday', moveTo: extra.weekendDate });
   }
   const valid = options.filter((o) => !o.until || gameMinutes(tsToHm(o.until), dayStartHour) < bedtime);
-  return valid.slice(0, 4);
+  return valid.slice(0, extra.weekendDate ? 5 : 4);
 }
 
 export interface PostponeWarning {

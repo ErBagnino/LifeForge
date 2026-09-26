@@ -93,6 +93,7 @@ export const TOOL_DEFS: ToolDef[] = [
   t('getDailyScore', 'read', 'Score breakdown for a date (default today).', z.object({ date: Iso.optional() })),
   t('getWeeklySummary', 'read', 'This week: average score, XP, coins, workouts, steps, strongest/weakest areas.', none),
   t('getGameRules', 'read', 'Current game rules (numbers) for a section, with their paths for updateGameRules.', z.object({ section: z.enum(['score', 'xp', 'coins', 'level', 'energy', 'hp', 'penalties', 'generator', 'streak']).optional() })),
+  t('getDailyContext', 'read', "Where the player is in their day: state (morning/working/post-work/evening…), wake-up time, today's work session, minutes available before bed, what still matters (prioritized) and learned habits. Fields the player didn't provide are 'unknown' — ask, don't guess.", none),
   t('getChangeHistory', 'read', 'Recent changes made through the Coach (for undo questions).', z.object({ limit: z.number().int().min(1).max(20).optional() })),
 
   // ——— Quests & one-time activities ———

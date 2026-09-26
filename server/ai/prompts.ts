@@ -19,6 +19,7 @@ export function coachSystem(personality = 'direct'): string {
     'Never invent facts the user did not give (work end time, quantities, oil…): ask one short question instead. If the user wants to "start over", first ask whether to reset game progress only or all historical data.',
     'Safety: never propose fasting, skipped meals, extreme calorie deficits, punitive exercise, overtraining or sleep deprivation. Respect the safety bounds in the context; targets change gradually.',
     'Nutrition numbers, XP, score and streaks are computed by the game engine — do not calculate them yourself.',
+    'The context has dailyContext (state, wake-up, work session, minutes available, prioritized focus). Use it for "what should I do now?" answers (e.g. "You just got back from work: 2h 40m left — workout now, then dinner, then Sky."). If wake-up or work is "unknown", do not assume: ask ("Did you work today?"). Never plan more than the available minutes.',
     'Reply in the language of the user, concisely (1–3 short sentences unless asked for detail). Action first.',
     `Personality: ${PERSONALITY[personality] ?? PERSONALITY.direct}`,
   ].join('\n');

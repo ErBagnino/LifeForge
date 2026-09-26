@@ -6,6 +6,7 @@ import { Button, Card, Chip } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { describeGoal } from '@/domain/goals';
 import { applyMultipliers, DIFFICULTY_LABELS, rewardMultipliers } from '@/domain/rewards';
+import { postponeContext } from '@/domain/dailyContext';
 import { postponeWarning, snoozeOptions } from '@/domain/snooze';
 import { worldBonuses } from '@/domain/tycoon';
 import { useAsync, useNow } from '@/hooks';
@@ -72,7 +73,9 @@ function QuestSheetBody({ quest: q, onClose, onMetric }: { quest: Quest; onClose
 
   const { data: activity } = useAsync(() => (q.activityId ? activityRepository.get(q.activityId) : Promise.resolve(undefined)), [q.activityId], { live: false });
   const isDaily = activity?.recurrence.type === 'daily';
-  const options = plan ? snoozeOptions(now, minuteOfDay(now), clock.today(), plan, activity?.recurrence, settings.dayStartHour) : [];
+  const context = useGame((st) => st.context);
+  const extra = context ? postponeContext({ now, date: clock.today(), dayStartHour: settings.dayStartHour, openWork: context.openWork, ctx: context.ctx, learned: context.learned }) : {};
+  const options = plan ? snoozeOptions(now, minuteOfDay(now), clock.today(), plan, activity?.recurrence, settings.dayStartHour, extra) : [];
   const warning = postponeWarning(q, q.rescheduleCount, settings.rules.penalties.snoozeWarnAt);
   const close = (p?: Promise<unknown>) => {
     void p;
@@ -252,7 +255,7 @@ function QuestSheetBody({ quest: q, onClose, onMetric }: { quest: Quest; onClose
                 variant="secondary"
                 size="lg"
                 className="flex-col !gap-0"
-                onClick={() => close(o.until ? actions.snooze(q, o.until) : actions.tomorrow(q))}
+                onClick={() => close(o.moveTo ? actions.moveTo(q, o.moveTo) : o.until ? actions.snooze(q, o.until) : actions.tomorrow(q))}
               >
                 <span>{o.label}</span>
                 <span className="num text-[12px] font-medium text-muted">{o.detail}</span>

@@ -76,6 +76,16 @@ export interface CoachSettings {
   ai: AiSettings;
 }
 
+/** Settings → Daily Routine. Manual times live in `schedule` (wake/sleep). */
+export interface RoutineSettings {
+  /** Learn wake-up, work and activity times from real events and propose changes. */
+  adaptive: boolean;
+  /** "Reset learned schedule": learning ignores everything before this timestamp. */
+  learnedSince?: number;
+  /** Ask "did you just wake up?" on the first morning open. */
+  askWake: boolean;
+}
+
 export interface NutritionTargets {
   calories: number;
   protein: number;
@@ -350,6 +360,7 @@ export interface Settings {
   exceptions: AvailabilityException[];
   load: { mode: LoadMode };
   coach: CoachSettings;
+  routine: RoutineSettings;
   nutrition: NutritionTargets;
   body: BodyProfile;
   steps: StepTargets;

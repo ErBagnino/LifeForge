@@ -175,3 +175,35 @@ export interface LedgerEntry {
   reason: string;
   refId?: ID;
 }
+
+/** One work session. "Start" = leaving home, so the commute is included. */
+export interface WorkSession {
+  start: Timestamp;
+  end?: Timestamp;
+  /** Minutes (end − start), set when the session ends. */
+  minutes?: number;
+  /** The player adjusted the times by hand. */
+  edited?: boolean;
+}
+
+/**
+ * What the player told LifeForge about a game day (wake-up, work) — facts only.
+ * The current state, available time and priorities are computed from it on the
+ * fly and never stored. Local only: never sent anywhere automatically.
+ */
+export interface DailyContext {
+  date: ISODate;
+  /** First time the app was opened this game day. */
+  firstOpenAt?: Timestamp;
+  wakeUpTime?: Timestamp;
+  wakeSource?: 'confirmed' | 'estimated' | 'manual';
+  /** "Not yet" answered at this time (don't ask again for a while). */
+  wakeAskedAt?: Timestamp;
+  /** START DAY pressed on the daily opening card. */
+  dayStartedAt?: Timestamp;
+  /** Work sessions that STARTED on this game day (a session crossing midnight stays here). */
+  work: WorkSession[];
+  /** The player said there is no work today (skips the work prompt). */
+  noWork?: boolean;
+  updatedAt: Timestamp;
+}

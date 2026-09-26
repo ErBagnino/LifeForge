@@ -67,6 +67,7 @@ const TABLE_SCHEMAS: Record<TableName, z.ZodType> = {
   meals: z.array(z.looseObject({ id: z.string(), date: isoDate, name: z.string(), kcal: z.number(), protein: z.number() })),
   aiUsage: z.array(z.looseObject({ id: z.string(), ts: z.number(), type: z.string() })),
   aiChanges: z.array(z.looseObject({ id: z.string(), ts: z.number(), tool: z.string() })),
+  dayContexts: z.array(z.looseObject({ date: isoDate, work: z.array(z.unknown()) })),
 };
 
 const EnvelopeSchema = z.object({

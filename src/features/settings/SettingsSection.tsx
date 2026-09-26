@@ -17,6 +17,7 @@ import { rescheduleReminders } from '@/services/notifications/reminderScheduler'
 import { useGame } from '@/store/gameStore';
 import { SchedulePanel } from './SchedulePanel';
 import { AiPanel } from './AiPanel';
+import { RoutinePanel } from './RoutinePanel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { goalLabel, profileFields } from '@/domain/profile';
 import type { CoachTone, GameDifficulty, NotificationType, Settings, ThemeMode } from '@/types';
@@ -48,6 +49,7 @@ const TITLES: Record<string, string> = {
   data: 'Data',
   coach: 'AI',
   ai: 'AI',
+  routine: 'Daily Routine',
 };
 
 export default function SettingsSection() {
@@ -65,6 +67,7 @@ export default function SettingsSection() {
     data: <DataPanel />,
     coach: <AiPanel />,
     ai: <AiPanel />,
+    routine: <RoutinePanel />,
   };
   return (
     <Screen back="/settings" title={TITLES[section] ?? 'Settings'}>

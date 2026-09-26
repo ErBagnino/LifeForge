@@ -13,6 +13,8 @@ export function useQuestActions() {
     skip: (q: Quest, reason: SkipReason) => act(qs.skipQuest(q.id, reason)),
     snooze: (q: Quest, until: number) => act(qs.snoozeQuest(q.id, until)),
     tomorrow: (q: Quest) => act(qs.moveQuestToTomorrow(q.id)),
+    moveTo: (q: Quest, date: string) => act(qs.updateQuestFields(q.id, { date })),
+    shorten: (q: Quest, durationMin: number) => act(qs.updateQuestFields(q.id, { durationMin, xp: Math.max(5, Math.round((q.xp * Math.max(0.5, durationMin / Math.max(1, q.durationMin))) / 5) * 5) })),
     reschedule: (q: Quest, time: TimeHM | undefined) => act(qs.rescheduleQuest(q.id, time)),
     setActual: (q: Quest, time: TimeHM) => act(qs.setActualTime(q.id, time)),
     reroll: (q: Quest) => act(qs.rerollQuest(q.id)),

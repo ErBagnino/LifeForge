@@ -28,6 +28,7 @@ export default function SettingsScreen() {
         <Row icon="🎮" iconBg="#ffe0e0" title="Game" subtitle={`Difficulty ${settings.difficulty} · coach ${settings.tone}`} onClick={go('game')} />
       </List>
       <List title="Your life">
+        <Row icon="🌅" iconBg="#fff1cc" title="Daily Routine" subtitle={settings.routine.adaptive ? 'Wake-up, work, sleep · adaptive' : 'Wake-up, work, sleep · manual'} onClick={go('routine')} />
         <Row icon="🕰️" iconBg="#d7ecff" title="Schedule" subtitle={`Work: ${fields.find((f) => f.key === 'work')?.value ?? 'Not set'}`} onClick={go('schedule')} />
         <Row icon="💬" iconBg="#e8e0ff" title="Configure with the Coach" subtitle="“From Monday I work 9–18”, “no gym this week”…" onClick={() => navigate('/coach')} />
         <Row icon="🎯" iconBg="#d6f5e6" title="Targets" subtitle="Nutrition, steps, water, play time, cardio" onClick={go('targets')} />

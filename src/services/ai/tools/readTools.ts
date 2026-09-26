@@ -22,6 +22,8 @@ import { weeklyReview } from '../../insightsService';
 import { upcomingTemporary } from '../../scheduleService';
 import { sessionStats } from '../../workoutService';
 import { recentChanges } from '../changeLog';
+import { contextSnapshot } from '../../contextService';
+import { dailyContextSummary } from '../dailyContextSummary';
 import { COUNTER_CATALOG } from './counters';
 
 /** Read tools: compact JSON for the model (every token counts against the Free Tier). */
@@ -262,6 +264,12 @@ export const READ_TOOLS: Record<string, ReadFn> = {
     const out: Record<string, number> = {};
     for (const k of sections) flatNumbers(settings.rules[k], k, out);
     return { rules: out, note: 'Pass these paths to updateGameRules.' };
+  },
+
+  async getDailyContext() {
+    const snap = await contextSnapshot();
+    if (!snap) throw new ToolError('Daily context is not available yet.');
+    return dailyContextSummary(snap);
   },
 
   async getChangeHistory(a) {
