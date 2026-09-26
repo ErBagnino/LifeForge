@@ -9,6 +9,7 @@ import { useAsync } from '@/hooks';
 import { clock } from '@/services/clock';
 import { deleteMetric, logMetric, METRIC_INPUT, metricEntries } from '@/services/metricsService';
 import { useGame } from '@/store/gameStore';
+import { MealBuilder } from '../nutrition/MealBuilder';
 import type { MetricType } from '@/types';
 import { blockMinutes, tsToHm } from '@/utils/date';
 import { formatInt, formatMl } from '@/utils/format';
@@ -146,56 +147,38 @@ function StepsPanel() {
 
 function FoodPanel() {
   const navigate = useNavigate();
-  const act = useGame((s) => s.act);
   const n = useGame((s) => s.settings?.nutrition);
   const m = useMetrics();
-  const [meal, setMeal] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [added, setAdded] = useState(0);
   if (!n) return null;
-  const rows: { key: keyof typeof meal; label: string; unit: string; target: number; color: string }[] = [
+  const rows: { key: 'calories' | 'protein' | 'carbs' | 'fat'; label: string; unit: string; target: number; color: string }[] = [
     { key: 'calories', label: 'Calories', unit: 'kcal', target: n.calories, color: 'var(--lf-accent)' },
     { key: 'protein', label: 'Protein', unit: 'g', target: n.protein, color: '#ff5a5f' },
-    { key: 'carbs', label: 'Carbs', unit: 'g', target: n.carbs, color: '#ffb020' },
+    { key: 'carbs', label: 'Carbs', unit: 'g', target: n.carbs, color: '#f5a524' },
     { key: 'fat', label: 'Fat', unit: 'g', target: n.fat, color: '#30b35a' },
   ];
-  const save = async () => {
-    for (const r of rows) if (meal[r.key] > 0) await act(logMetric(r.key, meal[r.key]));
-    setMeal({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-  };
   return (
     <div>
-      <Card className="space-y-2.5">
+      <Card className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         {rows.map((r) => (
           <div key={r.key}>
-            <div className="flex justify-between text-[13px]">
+            <div className="flex justify-between gap-1 text-[12px]">
               <span className="font-semibold">{r.label}</span>
               <span className="num text-muted">
-                {formatInt(m[r.key] ?? 0)} / {formatInt(r.target)} {r.unit}
+                {formatInt(m[r.key] ?? 0)}/{formatInt(r.target)}
               </span>
             </div>
             <ProgressBar value={(m[r.key] ?? 0) / r.target} color={r.color} height={6} className="mt-1" />
           </div>
         ))}
       </Card>
-      <div className="mt-3 text-[13px] font-semibold text-muted">Add a meal / snack</div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {rows.map((r) => (
-          <Field key={r.key} label={`${r.label} (${r.unit})`}>
-            <NumberInput value={meal[r.key]} onChange={(v) => setMeal((x) => ({ ...x, [r.key]: Math.max(0, v) }))} min={0} aria-label={r.label} />
-          </Field>
-        ))}
-      </div>
-      <Button block size="lg" className="mt-3" icon="plus" disabled={!Object.values(meal).some((v) => v > 0)} onClick={() => void save()}>
-        Add to today
+      <Button block variant="tinted" icon="camera" className="mt-3" onClick={() => navigate('/nutrition/scan')}>
+        Scan food instead
       </Button>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button variant="tinted" icon="camera" onClick={() => navigate('/nutrition/scan')}>
-          Food photo
-        </Button>
-        <Button variant="secondary" onClick={() => navigate('/nutrition')}>
-          Meals & presets
-        </Button>
+      <div className="mt-4">
+        {/* Re-mounted after each add so the form starts fresh. */}
+        <MealBuilder key={added} source="manual" onDone={() => setAdded((x) => x + 1)} />
       </div>
-      <p className="mt-2 px-1 text-[12px] text-muted">Targets are your settings, not medical advice. Awareness beats perfection.</p>
     </div>
   );
 }

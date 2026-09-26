@@ -1,8 +1,11 @@
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { approxQuantity, type FoodEstimate, type FoodItemEstimate } from '@/ai/shared/food';
-import { Field, NumberInput, TextInput } from '@/components/ui/forms';
+import { type FoodEstimate, type FoodItemEstimate, formatRange, portionRange } from '@/ai/shared/food';
+import { Field, NumberInput, TextInput, TimeInput } from '@/components/ui/forms';
+import { mealTypeAt, type MealType } from '@/config/meals';
+import { clock } from '@/services/clock';
+import { dateTimeToTs, tsToHm } from '@/utils/date';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Card, Chip, cx } from '@/components/ui/primitives';
 import { AiClientError } from '@/services/ai/gemini';
@@ -11,7 +14,7 @@ import { analyzeMeal, compressImage, type CompressedImage, diffEstimates, type E
 import { logMeal } from '@/services/metricsService';
 import { geminiReady, useAi } from '@/store/aiStore';
 import { useGame } from '@/store/gameStore';
-import { defaultMealName, MealBuilder } from './MealBuilder';
+import { defaultMealName, MealBuilder, MealPicker } from './MealBuilder';
 
 const CONF_COLOR = { low: 'var(--lf-danger)', medium: 'var(--lf-warning, #d98a00)', high: 'var(--lf-success)' } as const;
 const METHOD_LABEL: Record<string, string> = { unknown: '', mixed: 'mixed', grilled: 'grilled', fried: 'fried', baked: 'baked', boiled: 'boiled', steamed: 'steamed', roasted: 'roasted', sauteed: 'sautéed', raw: 'raw' };
@@ -38,14 +41,14 @@ function FoodRow({ f, editing, onChange, onRemove }: { f: FoodItemEstimate; edit
             <div className="text-[15px] leading-snug font-semibold break-words">{f.name}</div>
           )}
           <div className="num mt-0.5 text-[12px] text-muted">
-            {approxQuantity(f.estimatedQuantity, f.unit)}
+            {portionRange(f.estimatedQuantity, f.unit, f.confidence)}
             {method ? ` · ${method}` : ''} · <span style={{ color: CONF_COLOR[f.confidence] }}>{f.confidence}</span>
           </div>
         </div>
         <div className="num shrink-0 text-right">
-          <div className="text-[15px] font-bold">{Math.round(f.calories)} kcal</div>
+          <div className="text-[15px] font-bold">{editing ? `${Math.round(f.calories)} kcal` : formatRange(f.calories, f.confidence, 'kcal')}</div>
           <div className="text-[11px] text-muted">
-            P {Math.round(f.protein)} · C {Math.round(f.carbs)} · F {Math.round(f.fat)}
+            P ~{Math.round(f.protein)} · C ~{Math.round(f.carbs)} · F ~{Math.round(f.fat)}
           </div>
         </div>
         {editing && (
@@ -125,6 +128,9 @@ export default function FoodScanScreen() {
   const [editing, setEditing] = useState(false);
   const [edited, setEdited] = useState(false);
   const [manual, setManual] = useState(false);
+  const [mealType, setMealType] = useState<MealType>(() => mealTypeAt(new Date(clock.now())));
+  const [time, setTime] = useState(() => tsToHm(clock.now()));
+  const [chat, setChat] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
 
   useEffect(() => {
     void check();
@@ -185,11 +191,15 @@ export default function FoodScanScreen() {
   const revise = async (message: string) => {
     if (!estimate || !message.trim()) return;
     const before = estimate;
-    const next = await run('revise', (signal) => reviseMeal(before, message.trim(), { locale, signal }));
+    const said = message.trim();
+    const next = await run('revise', (signal) => reviseMeal(before, said, { locale, signal }));
     if (next) {
+      const d = diffEstimates(before, next);
+      const kcal = d.totals.find((t) => t.key === 'calories');
       setEstimate(next);
       setCorrected(true);
-      setDiff({ d: diffEstimates(before, next), summary: next.changeSummary });
+      setDiff({ d, summary: next.changeSummary });
+      setChat((c) => [...c, { role: 'user' as const, text: said }, { role: 'ai' as const, text: next.changeSummary || (kcal ? `Updated: ${kcal.before} → ${kcal.after} kcal.` : 'Updated the estimate.') }].slice(-8));
       setCorrection('');
       setExplanation(null);
     }
@@ -221,6 +231,8 @@ export default function FoodScanScreen() {
       await act(
         logMeal({
           name: estimate.mealName || defaultMealName(),
+          mealType,
+          ts: time ? dateTimeToTs(clock.today(), time, settings.dayStartHour) : undefined,
           items,
           kcal: t.calories,
           protein: t.protein,
@@ -362,26 +374,35 @@ export default function FoodScanScreen() {
             <TextInput value={estimate.mealName} onChange={(v) => setEstimate({ ...estimate, mealName: v.slice(0, 60) })} aria-label="Meal name" className="mt-2 !text-[18px] font-bold" />
 
             <Card className="mt-2 !p-3">
-              <div className="num grid grid-cols-4 gap-1 text-center">
-                <div>
-                  <div className="text-[20px] font-extrabold">~{totals.calories}</div>
-                  <div className="text-[11px] text-muted">kcal</div>
-                </div>
-                <div>
-                  <div className="text-[18px] font-bold">{totals.protein} g</div>
-                  <div className="text-[11px] text-muted">protein</div>
-                </div>
-                <div>
-                  <div className="text-[18px] font-bold">{totals.carbs} g</div>
-                  <div className="text-[11px] text-muted">carbs</div>
-                </div>
-                <div>
-                  <div className="text-[18px] font-bold">{totals.fat} g</div>
-                  <div className="text-[11px] text-muted">fat</div>
-                </div>
+              <div className="text-center">
+                <div className="num text-[26px] leading-tight font-extrabold">{formatRange(totals.calories, estimate.overallConfidence)}</div>
+                <div className="text-[12px] font-semibold text-muted">kcal · estimate ~{totals.calories}</div>
               </div>
-              <p className="mt-2 text-[12px] text-muted">Approximate values from a photo. Portions and hidden ingredients can change the real numbers.</p>
+              <div className="num mt-2 grid grid-cols-3 gap-1 border-t border-line pt-2 text-center">
+                {(
+                  [
+                    ['Protein', totals.protein],
+                    ['Carbs', totals.carbs],
+                    ['Fat', totals.fat],
+                  ] as const
+                ).map(([label, v]) => (
+                  <div key={label}>
+                    <div className="text-[16px] font-bold">{formatRange(v, estimate.overallConfidence, 'g')}</div>
+                    <div className="text-[11px] text-muted">{label}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[12px] text-muted">Estimated from a photo, not measured. The middle value is what gets logged — edit anything below.</p>
             </Card>
+
+            <div className="mt-3 mb-2 flex items-center justify-between gap-2 pl-1">
+              <span className="text-[13px] font-semibold text-muted">Meal</span>
+              <label className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+                Time
+                <TimeInput value={time} onChange={setTime} aria-label="Time" className="!h-10 !w-[144px] !px-3 !text-[15px]" />
+              </label>
+            </div>
+            <MealPicker value={mealType} onChange={setMealType} />
 
             {diff && <DiffCard diff={diff.d} summary={diff.summary} />}
 
@@ -408,18 +429,31 @@ export default function FoodScanScreen() {
               ))}
             </div>
 
-            <form
-              className="mt-3 flex items-center gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void revise(correction);
-              }}
-            >
-              <TextInput voice value={correction} onChange={setCorrection} placeholder="Correct it: “it was turkey”, “200 g of rice”…" aria-label="Correct the estimate" className="min-w-0 flex-1" />
-              <Button type="submit" className="!h-12 shrink-0" loading={busy === 'revise'} disabled={!correction.trim() || !!busy}>
-                Update
-              </Button>
-            </form>
+            <div className="mt-3 rounded-3xl bg-surface p-3 shadow-card">
+              <div className="flex items-center gap-1.5 text-[12px] font-extrabold tracking-[0.14em] text-muted">
+                <Icon name="sparkles" size={14} /> CORRECT THE ESTIMATE
+              </div>
+              {chat.length > 0 && (
+                <div className="mt-2 space-y-1.5" aria-live="polite">
+                  {chat.map((m, i) => (
+                    <div key={i} className={cx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <span className={cx('max-w-[85%] rounded-2xl px-3 py-1.5 text-[13px] leading-snug', m.role === 'user' ? 'bg-accent text-on-accent' : 'bg-surface-2')}>{m.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <form
+                className="mt-2 flex items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void revise(correction);
+                }}
+              >
+                <TextInput voice value={correction} onChange={setCorrection} placeholder="Tell the AI what to change…" aria-label="Tell the AI what to change" className="min-w-0 flex-1" />
+                <Button type="submit" aria-label="Send correction" className="!h-12 !w-12 shrink-0 !px-0" icon="send" loading={busy === 'revise'} disabled={!correction.trim() || !!busy} />
+              </form>
+              {!chat.length && <p className="mt-1.5 px-1 text-[12px] text-muted">e.g. “it was turkey”, “the rice was about 250 g”, “I added a spoon of oil”.</p>}
+            </div>
 
             <button type="button" onClick={() => void explain()} disabled={!!busy} className="mt-2 flex min-h-11 items-center gap-1 text-[14px] font-semibold text-accent disabled:opacity-50">
               <Icon name="info" size={16} /> {busy === 'explain' ? 'Asking…' : 'Why so many calories?'}
@@ -459,7 +493,7 @@ export default function FoodScanScreen() {
 
         {manual && (
           <div className="mt-4">
-            <MealBuilder key={estimate ? 'est' : 'manual'} photo={settings.coach.ai.savePhotos ? thumb : undefined} source={estimate ? 'ai' : image ? 'photo' : 'manual'} name={estimate?.mealName || defaultMealName()} initial={estimate ? estimateToItems(estimate) : []} onDone={() => navigate('/nutrition', { replace: true })} />
+            <MealBuilder photo={settings.coach.ai.savePhotos ? thumb : undefined} source={image ? 'photo' : 'manual'} name={estimate?.mealName ?? ''} onDone={() => navigate('/nutrition', { replace: true })} />
           </div>
         )}
       </div>

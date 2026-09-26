@@ -1,44 +1,81 @@
-import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
-import { Field, NumberInput, TextInput } from '@/components/ui/forms';
-import { Icon } from '@/components/ui/Icon';
+import { Field, NumberInput, TextInput, TimeInput } from '@/components/ui/forms';
 import { Button, cx } from '@/components/ui/primitives';
-import { FOOD_PRESETS, sumItems } from '@/data/foods';
+import { MEAL_INFO, MEAL_TYPES, mealTypeAt, type MealType } from '@/config/meals';
+import { FOOD_PRESETS } from '@/data/foods';
+import { clock } from '@/services/clock';
 import { logMeal } from '@/services/metricsService';
 import { useGame } from '@/store/gameStore';
-import type { Meal, MealItem } from '@/types';
+import type { Meal } from '@/types';
+import { dateTimeToTs, tsToHm } from '@/utils/date';
 
-interface Line extends MealItem {
-  key: string;
-  icon?: string;
-  portion?: string;
-  qty: number;
+/** Default meal label for "now" (device local time). */
+export function defaultMealName(date = new Date(clock.now())): string {
+  return MEAL_INFO[mealTypeAt(date)].label;
 }
 
-const QTY = [0.5, 1, 1.5, 2];
-const scale = (i: Line): MealItem => ({ name: i.name, grams: i.grams ? Math.round(i.grams * i.qty) : undefined, kcal: i.kcal * i.qty, protein: i.protein * i.qty, carbs: i.carbs * i.qty, fat: i.fat * i.qty });
-
-export function defaultMealName(date = new Date()): string {
-  const h = date.getHours();
-  return h < 10 ? 'Breakfast' : h < 12 ? 'Snack' : h < 15 ? 'Lunch' : h < 18 ? 'Snack' : 'Dinner';
+/** Meal picker: six meals in two rows of three. */
+export function MealPicker({ value, onChange }: { value: MealType; onChange: (t: MealType) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Meal">
+      {MEAL_TYPES.map((t) => (
+        <button
+          key={t}
+          type="button"
+          role="radio"
+          aria-checked={value === t}
+          onClick={() => onChange(t)}
+          className={cx('flex h-[62px] flex-col items-center justify-center rounded-2xl px-1 text-[12px] leading-tight font-semibold transition-colors', value === t ? 'bg-accent text-on-accent' : 'bg-surface text-fg shadow-card')}
+        >
+          <span className="text-[17px] leading-none" aria-hidden>
+            {MEAL_INFO[t].icon}
+          </span>
+          <span className="mt-0.5 text-center">{MEAL_INFO[t].label}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
-/** Build a meal from presets, custom foods or an estimate, then log it in one tap. */
-export function MealBuilder({ initial = [], photo, source, name: initialName, onDone }: { initial?: MealItem[]; photo?: string; source: Meal['source']; name?: string; onDone?: () => void }) {
+const NUTRIENTS = [
+  { key: 'kcal', label: 'Calories', unit: 'kcal' },
+  { key: 'protein', label: 'Protein', unit: 'g' },
+  { key: 'carbs', label: 'Carbs', unit: 'g' },
+  { key: 'fat', label: 'Fat', unit: 'g' },
+] as const;
+type Macros = Record<(typeof NUTRIENTS)[number]['key'], number>;
+const EMPTY: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+
+/**
+ * ADD FOOD: what did you eat → meal (pre-selected from the clock) → time → calories and macros
+ * → ADD FOOD. No categories. Presets only fill the fields; everything stays editable.
+ */
+export function MealBuilder({ photo, source = 'manual', name: initialName = '', onDone }: { photo?: string; source?: Meal['source']; name?: string; onDone?: () => void }) {
   const act = useGame((s) => s.act);
-  const [name, setName] = useState(initialName ?? defaultMealName());
-  const [lines, setLines] = useState<Line[]>(() => initial.map((i, k) => ({ ...i, key: `i${k}`, qty: 1 })));
-  const [custom, setCustom] = useState({ name: '', kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  const dayStartHour = useGame((s) => s.settings?.dayStartHour ?? 4);
+  const [name, setName] = useState(initialName);
+  const [time, setTime] = useState(() => tsToHm(clock.now()));
+  const [mealType, setMealType] = useState<MealType>(() => mealTypeAt(new Date(clock.now())));
+  const [pickedMeal, setPickedMeal] = useState(false);
+  const [macros, setMacros] = useState<Macros>(EMPTY);
+  const [preset, setPreset] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const total = sumItems(lines.map(scale));
-  const add = (l: Omit<Line, 'key' | 'qty'>) => setLines((x) => [...x, { ...l, key: `${Date.now()}${x.length}`, qty: 1 }]);
+  const ready = name.trim().length > 0 && Object.values(macros).some((v) => v > 0);
+
+  const onTime = (hm: string) => {
+    setTime(hm);
+    // Follow the clock until the player picks a meal themselves.
+    if (!pickedMeal && hm) setMealType(mealTypeAt(new Date(dateTimeToTs(clock.today(), hm, dayStartHour))));
+  };
 
   const save = async () => {
+    if (!ready) return;
     setBusy(true);
     try {
-      const items = lines.map(scale);
-      await act(logMeal({ name: name.trim() || defaultMealName(), items, ...sumItems(items), photo, source: lines.length && source === 'manual' && lines.every((l) => l.icon) ? 'preset' : source }));
-      setLines([]);
+      const food = name.trim().slice(0, 60);
+      const item = { name: food, kcal: macros.kcal, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, grams: preset ? FOOD_PRESETS.find((p) => p.id === preset)?.grams : undefined };
+      const ts = time ? dateTimeToTs(clock.today(), time, dayStartHour) : clock.now();
+      await act(logMeal({ name: food, mealType, ts, items: [item], kcal: macros.kcal, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, photo, source: preset && source === 'manual' ? 'preset' : source }));
       onDone?.();
     } finally {
       setBusy(false);
@@ -46,82 +83,72 @@ export function MealBuilder({ initial = [], photo, source, name: initialName, on
   };
 
   return (
-    <div>
-      <Field label="Meal">
-        <TextInput value={name} onChange={setName} aria-label="Meal name" maxLength={40} />
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <Field label="What did you eat?">
+        <TextInput
+          voice
+          value={name}
+          onChange={(v) => {
+            setName(v);
+            if (preset) setPreset(null);
+          }}
+          placeholder="e.g. Pasta al pomodoro"
+          aria-label="What did you eat?"
+          maxLength={60}
+        />
       </Field>
 
-      <AnimatePresence initial={false}>
-        {lines.map((l) => (
-          <motion.div key={l.key} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="mt-2 rounded-2xl bg-surface p-3 shadow-card">
-              <div className="flex items-start gap-2">
-                {l.icon && (
-                  <span className="text-[22px]" aria-hidden>
-                    {l.icon}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-semibold">{l.name}</div>
-                  <div className="num text-[12px] text-muted">
-                    {Math.round(l.kcal * l.qty)} kcal · {Math.round(l.protein * l.qty)} g protein{l.portion ? ` · ${l.portion}${l.qty !== 1 ? ` ×${l.qty}` : ''}` : ''}
-                  </div>
-                </div>
-                <button type="button" aria-label={`Remove ${l.name}`} onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))} className="-mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
-                  <Icon name="close" size={16} />
-                </button>
-              </div>
-              <div className="mt-2 grid grid-cols-4 gap-1">
-                {QTY.map((q) => (
-                  <button key={q} type="button" aria-pressed={l.qty === q} onClick={() => setLines((x) => x.map((y) => (y.key === l.key ? { ...y, qty: q } : y)))} className={cx('h-10 rounded-xl text-[13px] font-bold', l.qty === q ? 'bg-accent text-on-accent' : 'bg-surface-2')}>
-                    {q === 0.5 ? '½' : q === 1.5 ? '1½' : q}×
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-
-      <div className="mt-4 text-[13px] font-semibold text-muted">Quick add</div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-2 -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scroll-touch" aria-label="Quick fill">
         {FOOD_PRESETS.map((f) => (
-          <button key={f.id} type="button" onClick={() => add(f)} className="flex h-11 items-center gap-1.5 rounded-full bg-surface px-3 text-[14px] font-semibold shadow-card active:scale-95">
+          <button
+            key={f.id}
+            type="button"
+            aria-pressed={preset === f.id}
+            onClick={() => {
+              setPreset(f.id);
+              setName(f.name);
+              setMacros({ kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat });
+            }}
+            className={cx('flex h-9 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-semibold whitespace-nowrap', preset === f.id ? 'bg-accent text-on-accent' : 'bg-surface-2 text-fg')}
+          >
             <span aria-hidden>{f.icon}</span> {f.name}
           </button>
         ))}
       </div>
+      {preset && <p className="mt-1 px-1 text-[12px] text-muted">Typical portion: {FOOD_PRESETS.find((p) => p.id === preset)?.portion}. Adjust the numbers if yours was different.</p>}
 
-      <details className="mt-4 rounded-2xl bg-surface p-3 shadow-card">
-        <summary className="flex min-h-11 cursor-pointer items-center text-[14px] font-semibold">Something else (enter values)</summary>
-        <div className="mt-2 space-y-2">
-          <TextInput value={custom.name} onChange={(v) => setCustom({ ...custom, name: v })} placeholder="Food name" aria-label="Food name" voice />
-          <div className="grid grid-cols-2 gap-2">
-            {(['kcal', 'protein', 'carbs', 'fat'] as const).map((k) => (
-              <Field key={k} label={k === 'kcal' ? 'Calories (kcal)' : `${k[0].toUpperCase()}${k.slice(1)} (g)`}>
-                <NumberInput value={custom[k]} onChange={(v) => setCustom({ ...custom, [k]: Math.max(0, v) })} min={0} aria-label={k} />
-              </Field>
-            ))}
-          </div>
-          <Button
-            block
-            variant="tinted"
-            icon="plus"
-            disabled={!custom.kcal && !custom.protein}
-            onClick={() => {
-              add({ name: custom.name.trim() || 'Food', kcal: custom.kcal, protein: custom.protein, carbs: custom.carbs, fat: custom.fat });
-              setCustom({ name: '', kcal: 0, protein: 0, carbs: 0, fat: 0 });
-            }}
-          >
-            Add to meal
-          </Button>
-        </div>
-      </details>
+      <div className="mt-4 mb-2 flex items-center justify-between gap-2 pl-1">
+        <span className="text-[13px] font-semibold text-muted">Meal</span>
+        <label className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+          Time
+          <TimeInput value={time} onChange={onTime} aria-label="Time" className="!h-10 !w-[144px] !px-3 !text-[15px]" />
+        </label>
+      </div>
+      <MealPicker
+        value={mealType}
+        onChange={(t) => {
+          setMealType(t);
+          setPickedMeal(true);
+        }}
+      />
 
-      <Button block size="lg" className="mt-4" icon="check" disabled={!lines.length} loading={busy} onClick={() => void save()}>
-        {lines.length ? `Log meal · ${Math.round(total.kcal)} kcal · ${Math.round(total.protein)} g` : 'Add something first'}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {NUTRIENTS.map((n) => (
+          <Field key={n.key} label={`${n.label} (${n.unit})`}>
+            <NumberInput value={macros[n.key]} min={0} max={n.key === 'kcal' ? 10000 : 1000} onChange={(v) => setMacros((m) => ({ ...m, [n.key]: v }))} aria-label={n.label} />
+          </Field>
+        ))}
+      </div>
+
+      <Button type="submit" block size="lg" className="mt-4" icon="plus" disabled={!ready} loading={busy}>
+        {ready ? `ADD FOOD · ${Math.round(macros.kcal)} kcal` : name.trim() ? 'Add calories or macros' : 'ADD FOOD'}
       </Button>
-      <p className="mt-2 px-1 text-[12px] text-muted">Values are estimates. Awareness beats perfection — there are no “bad” meals here.</p>
-    </div>
+      <p className="mt-2 px-1 text-[12px] text-muted">Rough numbers are fine — awareness beats perfection.</p>
+    </form>
   );
 }

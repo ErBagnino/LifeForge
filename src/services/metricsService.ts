@@ -201,7 +201,7 @@ export async function stopLeisure(): Promise<QuestResult & { minutes: number }> 
 
 // ——— Meals ———
 
-export type MealInput = Omit<Meal, 'id' | 'ts' | 'date'> & { date?: ISODate };
+export type MealInput = Omit<Meal, 'id' | 'ts' | 'date'> & { date?: ISODate; ts?: number };
 
 const MACROS: [MetricType, keyof Pick<Meal, 'kcal' | 'protein' | 'carbs' | 'fat'>][] = [
   ['calories', 'kcal'],
@@ -213,7 +213,8 @@ const MACROS: [MetricType, keyof Pick<Meal, 'kcal' | 'protein' | 'carbs' | 'fat'
 /** Log a meal: stored with its items/photo, and its macros feed the daily metrics (and quests). */
 export async function logMeal(input: MealInput): Promise<QuestResult> {
   const date = input.date ?? clock.today();
-  const meal: Meal = { ...input, id: uid('meal_'), ts: clock.now(), date };
+  const { ts, ...rest } = input;
+  const meal: Meal = { ...rest, id: uid('meal_'), ts: ts ?? clock.now(), date };
   await statsRepository.putMeal(meal);
   const events: QuestResult['events'] = [];
   const features: string[] = [];
@@ -225,6 +226,39 @@ export async function logMeal(input: MealInput): Promise<QuestResult> {
     features.push(...r.features);
   }
   return { events, features };
+}
+
+/**
+ * Edit a logged meal (name, meal, time, values). Its metric entries are changed in place and
+ * the day's totals and nutrition quests re-synced, so an edit never grants a second reward.
+ */
+export function updateMeal(meal: Meal, patch: Partial<Pick<Meal, 'name' | 'mealType' | 'ts' | 'kcal' | 'protein' | 'carbs' | 'fat'>>): Promise<QuestResult> {
+  return withTransaction(async () => {
+    const next: Meal = { ...meal, ...patch };
+    if (meal.items.length === 1) next.items = [{ ...meal.items[0], name: next.name, kcal: next.kcal, protein: next.protein, carbs: next.carbs, fat: next.fat }];
+    else if (patch.kcal !== undefined || patch.protein !== undefined || patch.carbs !== undefined || patch.fat !== undefined) next.estimate = meal.estimate ? { ...meal.estimate, edited: true } : undefined;
+    await statsRepository.putMeal(next);
+    const tx = await GameTx.open(meal.date);
+    const existing = await statsRepository.metricsByRef(meal.id);
+    for (const [type, key] of MACROS) {
+      const v = Math.round(next[key]);
+      const entry = existing.find((m) => m.type === type);
+      if (entry) {
+        if (v > 0) await statsRepository.addMetric({ ...entry, value: v, note: next.name });
+        else await statsRepository.removeMetric(entry.id);
+      } else if (v > 0) {
+        await statsRepository.addMetric({ id: uid('m_'), date: meal.date, type, value: v, ts: next.ts, note: next.name, source: 'manual', refId: meal.id });
+      }
+    }
+    const after = aggregateMetrics(await statsRepository.metricsByDate(meal.date));
+    tx.log.metrics = after;
+    if (!tx.log.closed) {
+      for (const [type] of MACROS) await syncMetricQuests(tx, type, after[type] ?? 0);
+      await settleDay(tx);
+    }
+    await tx.commit();
+    return { events: tx.events, features: tx.unlockedFeatures };
+  });
 }
 
 export async function deleteMeal(meal: Meal): Promise<QuestResult> {

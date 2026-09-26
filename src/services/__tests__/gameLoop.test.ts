@@ -5,7 +5,7 @@ import { beginAdventure, closeDay, ensureToday, setDayType } from '../game/daySe
 import { completeQuest, keepQuest, loadDay, skipQuest, snoozeQuest, uncompleteQuest } from '../game/questService';
 import { addWorkSchedule, newSchedule, setTemporaryWork } from '../scheduleService';
 import { planFor } from '../game/dayPlan';
-import { deleteMeal, getLeisureTimer, logMeal, logMetric, startLeisure, stopLeisure } from '../metricsService';
+import { deleteMeal, getLeisureTimer, logMeal, logMetric, startLeisure, stopLeisure, updateMeal } from '../metricsService';
 import { buyCosmetic, buildOrUpgrade } from '../tycoonService';
 import { exportData, importData, validateImport } from '../exportService';
 import { finishSession, startSession, saveSession, decideSuggestion } from '../workoutService';
@@ -200,6 +200,22 @@ describe('game loop (IndexedDB)', () => {
     log = await statsRepository.getLog(clock.today());
     expect(log?.metrics.calories ?? 0).toBe(0);
     expect(await statsRepository.mealsByDate(clock.today())).toHaveLength(0);
+  });
+
+  it('editing a logged meal updates the day totals in place (no duplicate entries, meal type and time kept)', async () => {
+    await logMeal({ name: 'Pizza', mealType: 'dinner', ts: new Date('2026-09-21T20:15:00').getTime(), items: [{ name: 'Pizza', kcal: 800, protein: 32, carbs: 100, fat: 28 }], kcal: 800, protein: 32, carbs: 100, fat: 28, source: 'manual' });
+    const [meal] = await statsRepository.mealsByDate(clock.today());
+    expect(meal.mealType).toBe('dinner');
+    expect(new Date(meal.ts).getHours()).toBe(20);
+    await updateMeal(meal, { name: 'Half pizza', kcal: 400, protein: 16, carbs: 50, fat: 0, mealType: 'lunch' });
+    const log = await statsRepository.getLog(clock.today());
+    expect(log?.metrics).toMatchObject({ calories: 400, protein: 16, carbs: 50 });
+    expect(log?.metrics.fat ?? 0).toBe(0);
+    const refs = await statsRepository.metricsByRef(meal.id);
+    expect(refs.map((r) => r.type).sort()).toEqual(['calories', 'carbs', 'protein']);
+    const [edited] = await statsRepository.mealsByDate(clock.today());
+    expect(edited).toMatchObject({ name: 'Half pizza', mealType: 'lunch', kcal: 400 });
+    expect(edited.items[0]).toMatchObject({ name: 'Half pizza', kcal: 400 });
   });
 
   it('tycoon: building is blocked by level and coins', async () => {

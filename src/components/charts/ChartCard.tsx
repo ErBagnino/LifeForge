@@ -2,6 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card } from '../ui/primitives';
 
+/** Axis ticks stay short (units live in the title and tooltip): 1800 → 1.8k. */
+const compactTick = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 100) / 10}k` : String(Math.round(v * 10) / 10));
+
 export interface Series {
   key: string;
   label: string;
@@ -100,7 +103,7 @@ export function ChartCard({
               <BarChart data={data} margin={{ top: 6, right: 4, left: -18, bottom: 0 }} barCategoryGap="22%">
                 <CartesianGrid stroke="var(--lf-border)" vertical={false} />
                 <XAxis dataKey={xKey} tick={axisTick} tickLine={false} axisLine={false} minTickGap={12} />
-                <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => format(Number(v))} width={46} />
+                <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => compactTick(Number(v))} width={40} />
                 <Tooltip cursor={{ fill: 'var(--lf-surface-2)' }} contentStyle={tooltipStyle} formatter={(v, n) => [format(Number(v)), series.find((s) => s.key === n)?.label ?? n]} />
                 {reference && <ReferenceLine y={reference.y} stroke="var(--lf-muted)" strokeDasharray="4 4" label={{ value: reference.label, fontSize: 10, fill: 'var(--lf-muted)', position: 'insideTopRight' }} />}
                 {series.map((s) => (
@@ -111,7 +114,7 @@ export function ChartCard({
               <LineChart data={data} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke="var(--lf-border)" vertical={false} />
                 <XAxis dataKey={xKey} tick={axisTick} tickLine={false} axisLine={false} minTickGap={16} />
-                <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => format(Number(v))} width={46} domain={['auto', 'auto']} />
+                <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => compactTick(Number(v))} width={40} domain={['auto', 'auto']} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [format(Number(v)), series.find((s) => s.key === n)?.label ?? n]} />
                 {reference && <ReferenceLine y={reference.y} stroke="var(--lf-muted)" strokeDasharray="4 4" label={{ value: reference.label, fontSize: 10, fill: 'var(--lf-muted)', position: 'insideTopRight' }} />}
                 {series.map((s) => (

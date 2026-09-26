@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { haptics } from '@/services/haptics';
 import { Icon, type IconName } from './Icon';
 import { cx } from './primitives';
@@ -133,7 +133,7 @@ export function TextInput({ value, onChange, placeholder, type = 'text', inputMo
     return (
       <div className={cx('relative', className)}>
         <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} inputMode={inputMode} autoFocus={autoFocus} className={cx(inputBase, 'pr-12')} {...rest} />
-        <VoiceMic className="absolute top-1/2 right-1.5 -translate-y-1/2" onText={(t) => onChange(t)} />
+        <VoiceMic className="absolute top-1/2 right-1.5 -translate-y-1/2" base={String(value)} onText={(t) => onChange(t)} />
       </div>
     );
   }
@@ -151,27 +151,48 @@ export function TextInput({ value, onChange, placeholder, type = 'text', inputMo
   );
 }
 
-export function NumberInput({ value, onChange, min, max, step = 1, className, ...rest }: {
+const parseNum = (t: string): number => {
+  const v = parseFloat(t.replace(',', '.'));
+  return Number.isFinite(v) ? v : 0;
+};
+const formatNum = (v: number): string => (Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '');
+
+/**
+ * Numeric field that behaves on iPhone: a text input with the decimal keypad (so "1,5" works
+ * with an Italian keyboard — iOS reports an empty value for commas in type="number"), a local
+ * draft so the field can be cleared or hold "1," while typing, and clamping on blur.
+ */
+export function NumberInput({ value, onChange, min, max, step = 1, className, placeholder, ...rest }: {
   value: number;
   onChange: (v: number) => void;
   min?: number;
   max?: number;
   step?: number;
   className?: string;
+  placeholder?: string;
   'aria-label'?: string;
 }) {
+  const [draft, setDraft] = useState(() => formatNum(value));
+  useEffect(() => {
+    // Sync external changes (e.g. a preset fills the field) without fighting the user's typing.
+    setDraft((d) => (parseNum(d) === value ? d : formatNum(value)));
+  }, [value]);
+  const clamp = (v: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
   return (
     <input
-      type="number"
-      inputMode="decimal"
-      value={Number.isFinite(value) ? value : ''}
-      min={min}
-      max={max}
-      step={step}
+      type="text"
+      inputMode={step < 1 ? 'decimal' : min !== undefined && min >= 0 ? 'decimal' : 'text'}
+      autoComplete="off"
+      enterKeyHint="done"
+      value={draft}
+      placeholder={placeholder ?? '0'}
       onChange={(e) => {
-        const v = parseFloat(e.target.value.replace(',', '.'));
-        onChange(Number.isFinite(v) ? v : 0);
+        const t = e.target.value.replace(/[^0-9.,-]/g, '');
+        setDraft(t);
+        onChange(clamp(parseNum(t)));
       }}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={() => setDraft(formatNum(clamp(value)))}
       className={cx(inputBase, 'num', className)}
       {...rest}
     />

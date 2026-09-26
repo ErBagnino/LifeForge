@@ -223,3 +223,23 @@ describe('HP', () => {
     expect(makeActivity().active).toBe(true);
   });
 });
+
+describe('meal windows and honest estimate ranges', () => {
+  it('pre-selects the meal from the local time (configurable windows)', async () => {
+    const { mealTypeAt } = await import('@/config/meals');
+    const at = (hm: string) => mealTypeAt(new Date(`2026-09-23T${hm}:00`));
+    expect([at('07:00'), at('10:29'), at('10:30'), at('12:00'), at('15:00'), at('18:29'), at('18:30'), at('22:30'), at('01:00')]).toEqual(['breakfast', 'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'afternoon_snack', 'dinner', 'night_snack', 'night_snack']);
+    expect(mealTypeAt(new Date('2026-09-23T09:00:00'), [{ type: 'breakfast', start: '05:00' }, { type: 'lunch', start: '08:30' }])).toBe('lunch');
+  });
+
+  it('shows photo estimates as ranges that widen with lower confidence', async () => {
+    const { estimateRange, formatRange, portionRange } = await import('@/ai/shared/food');
+    expect(estimateRange(400, 'high')).toEqual([350, 450]);
+    expect(estimateRange(400, 'low')).toEqual([280, 520]);
+    expect(formatRange(397, 'medium', 'kcal')).toBe('~320–480 kcal');
+    expect(portionRange(175, 'g', 'medium')).toBe('~140–210 g');
+    expect(portionRange(2, 'slice')).toBe('~2 slices');
+    expect(formatRange(3, 'medium', 'g')).toBe('~3 g');
+  });
+});
+

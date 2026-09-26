@@ -148,3 +148,34 @@ export function coerceEstimate(raw: unknown): unknown {
     ...(changeSummary ? { changeSummary } : {}),
   };
 }
+
+// ——— Honest ranges: a photo estimate is never a measurement ———
+
+const SPREAD: Record<(typeof CONFIDENCE)[number], number> = { low: 0.3, medium: 0.2, high: 0.12 };
+const roundTo = (v: number, step: number) => Math.max(0, Math.round(v / step) * step);
+const stepFor = (v: number) => (v >= 200 ? 10 : v >= 50 ? 5 : 1);
+
+/** A plausible range around an estimate, wider when confidence is lower (e.g. 397 kcal, medium → 320–480). */
+export function estimateRange(value: number, confidence: (typeof CONFIDENCE)[number] = 'medium'): [number, number] {
+  if (value <= 0) return [0, 0];
+  const s = SPREAD[confidence];
+  const step = stepFor(value);
+  const lo = roundTo(value * (1 - s), step);
+  const hi = Math.max(lo + step, roundTo(value * (1 + s), step));
+  return [lo, hi];
+}
+
+/** "~320–480" (or "~5" for tiny values where a range would be noise). */
+export function formatRange(value: number, confidence: (typeof CONFIDENCE)[number] = 'medium', unit = ''): string {
+  const [lo, hi] = estimateRange(value, confidence);
+  const u = unit ? (unit === 'kcal' ? ' kcal' : ` ${unit}`) : '';
+  if (hi <= 5) return `~${Math.round(value)}${u}`;
+  return `~${lo}–${hi}${u}`;
+}
+
+/** Portion as a range for weight/volume units ("~150–200 g"); counted units stay approximate ("~2 slices"). */
+export function portionRange(q: number, unit: string, confidence: (typeof CONFIDENCE)[number] = 'medium'): string {
+  if (unit !== 'g' && unit !== 'ml') return approxQuantity(q, unit);
+  const [lo, hi] = estimateRange(q, confidence);
+  return hi <= 10 ? approxQuantity(q, unit) : `~${lo}–${hi} ${unit}`;
+}

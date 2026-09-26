@@ -12,7 +12,8 @@ import {
   workoutRepository,
 } from '@/repositories';
 import type { Achievement, Activity, ActivityCategory, Difficulty, Quest, QuestGoal, QuestTier, Recurrence, Routine, Settings, TimeHM, WorkDayEntry } from '@/types';
-import { daysBetween, formatDate } from '@/utils/date';
+import { dateTimeToTs, daysBetween, formatDate } from '@/utils/date';
+import { clock } from '../../clock';
 import { uid } from '@/utils/id';
 import { roundTo } from '@/utils/math';
 import { deleteActivity, deleteRoutine, saveActivity, saveRoutine, saveSettings, savePlan } from '../../adminService';
@@ -20,7 +21,8 @@ import { applyChanges, describeChanges } from '../../coachService';
 import type { GameEvent } from '../../events';
 import { addQuests, completeQuest, deleteQuest, skipQuest, updateQuestFields } from '../../game/questService';
 import { manualQuest } from '../../game/questFactory';
-import { logMetric } from '../../metricsService';
+import { logMeal, logMetric } from '../../metricsService';
+import { MEAL_INFO, mealTypeAt, type MealType } from '@/config/meals';
 import { RESET_INFO, RESET_PHRASE, runReset, type ResetKind } from '../../resetService';
 import { setWorkingWeight } from '../../workoutService';
 import { isKnownCounter } from './counters';
@@ -392,6 +394,45 @@ export const WRITE_TOOLS: Record<string, PlanFn> = {
       async apply() {
         const r = await skipQuest(q.id, (a.reason as never) ?? 'other');
         return { message: `Skipped "${q.title}".`, events: r.events };
+      },
+    };
+  },
+
+  // ——— Food & water log ———
+
+  async logFood(a, ctx) {
+    const mealType = (a.mealType as MealType | undefined) ?? mealTypeAt(new Date(a.time ? dateTimeToTs(ctx.today, String(a.time), ctx.settings.dayStartHour) : clock.now()));
+    const ts = a.time ? dateTimeToTs(ctx.today, String(a.time), ctx.settings.dayStartHour) : undefined;
+    const v = { kcal: Math.round(Number(a.kcal)), protein: Math.round(Number(a.protein)), carbs: Math.round(Number(a.carbs)), fat: Math.round(Number(a.fat)) };
+    if (!v.kcal && !v.protein && !v.carbs && !v.fat) throw new ToolError('Give at least calories or one macro.');
+    const name = String(a.name);
+    return {
+      title: `Log food: ${name}`,
+      lines: [
+        { label: 'Meal', after: `${MEAL_INFO[mealType].label}${a.time ? ` · ${a.time}` : ''}` },
+        { label: 'Calories', after: `~${v.kcal} kcal` },
+        { label: 'Protein · Carbs · Fat', after: `~${v.protein} · ${v.carbs} · ${v.fat} g` },
+      ],
+      warnings: ['Estimated values — you can edit or delete the meal in Nutrition.'],
+      undo: 'none',
+      async apply() {
+        const r = await logMeal({ name, mealType, ts, items: [{ name, ...v }], ...v, source: 'ai' });
+        return { message: `Logged "${name}" (~${v.kcal} kcal) as ${MEAL_INFO[mealType].label}.`, data: { ...v, mealType }, events: r.events };
+      },
+    };
+  },
+
+  async logWater(a, ctx) {
+    const ml = Number(a.ml);
+    const before = ctx.today === clock.today() ? ((await statsRepository.metricsByDate(ctx.today)).filter((m) => m.type === 'water').reduce((s, m) => s + m.value, 0)) : 0;
+    return {
+      title: `Log water: ${ml} ml`,
+      lines: [{ label: 'Water today', before: `${(before / 1000).toFixed(2)} L`, after: `${((before + ml) / 1000).toFixed(2)} L` }],
+      warnings: [],
+      undo: 'none',
+      async apply() {
+        const r = await logMetric('water', ml);
+        return { message: `Logged ${ml} ml of water.`, data: { ml }, events: r.events };
       },
     };
   },

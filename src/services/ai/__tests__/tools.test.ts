@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { activityRepository, getDb, metaRepository, playerRepository, questRepository, resetDbInstance, settingsRepository, workoutRepository } from '@/repositories';
+import { activityRepository, getDb, metaRepository, playerRepository, questRepository, resetDbInstance, settingsRepository, statsRepository, workoutRepository } from '@/repositories';
 import { ensureSeeded } from '../../seedService';
 import { beginAdventure } from '../../game/dayService';
 import { clock } from '../../clock';
@@ -28,6 +28,21 @@ describe('AI tool registry', () => {
 
   it('implements every declared tool', () => {
     expect(missingImplementations()).toEqual([]);
+  });
+
+  it('logFood logs a real meal (meal type from the time) only after APPLY; logWater adds water', async () => {
+    const a = await action('logFood', { name: 'Pizza margherita', time: '20:30', kcal: 820, protein: 33, carbs: 101, fat: 28 });
+    expect(JSON.stringify(a)).toMatch(/Dinner · 20:30/);
+    expect(await getDb().meals.count()).toBe(0); // nothing written before confirmation
+    const { result: r } = await execute(a, { source: 'gemini' });
+    expect(r.success).toBe(true);
+    const [meal] = await getDb().meals.toArray();
+    expect(meal).toMatchObject({ name: 'Pizza margherita', mealType: 'dinner', kcal: 820, source: 'ai' });
+    expect((await statsRepository.getLog('2026-09-23'))?.metrics.calories).toBe(820);
+    const { result: w } = await execute(await action('logWater', { ml: 500 }), { source: 'gemini' });
+    expect(w.success).toBe(true);
+    expect((await statsRepository.getLog('2026-09-23'))?.metrics.water).toBe(500);
+    expect(validateCall({ name: 'logFood', args: { name: 'x', kcal: -5, protein: 0, carbs: 0, fat: 0 } }).ok).toBe(false);
   });
 
   it('rejects invalid arguments before anything runs', async () => {

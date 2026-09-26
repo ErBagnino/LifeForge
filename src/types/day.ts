@@ -1,3 +1,4 @@
+import type { MealType } from '@/config/meals';
 import type {
   DayType,
   DifficultyState,
@@ -135,6 +136,8 @@ export interface Meal {
   /** Small JPEG data URL (≈320 px) when logged from a photo. */
   photo?: string;
   source: 'manual' | 'preset' | 'photo' | 'ai';
+  /** Breakfast … Night Snack (older meals may not have it: see mealTypeOf). */
+  mealType?: MealType;
   note?: string;
   /** Present when the values came from a Gemini photo estimate (always approximate). */
   estimate?: { confidence: 'low' | 'medium' | 'high'; corrected: boolean; edited: boolean };
