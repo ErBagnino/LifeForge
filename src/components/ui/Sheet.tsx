@@ -40,16 +40,26 @@ export function Sheet({
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   useBodyLock(open);
+  // Callers usually pass an inline onClose, which changes on every render (every keystroke in
+  // a field inside the sheet). Keep it in a ref so the effect below runs only when the sheet
+  // opens: re-running it moved focus to the panel after each character and closed the iOS keyboard.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', onKey);
-    const t = setTimeout(() => panel.current?.focus(), 50);
+    const t = setTimeout(() => {
+      // Move focus into the dialog for screen readers, unless something inside already has it.
+      if (panel.current && !panel.current.contains(document.activeElement)) panel.current.focus({ preventScroll: true });
+    }, 50);
     return () => {
       window.removeEventListener('keydown', onKey);
       clearTimeout(t);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.y > 110 || info.velocity.y > 600) onClose();
