@@ -31,7 +31,8 @@ export function AskSheet() {
   const settings = useGame((s) => s.settings);
   const [text, setText] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
-  const speech = useSpeech(settings?.coach.voiceLang ?? '', (t) => setText(t));
+  const prefix = useRef('');
+  const speech = useSpeech(settings?.coach.voiceLang ?? '', (t) => setText(prefix.current ? `${prefix.current} ${t}` : t));
 
   // The microphone only starts from a tap on the big button (iOS blocks or hangs speech
   // recognition started outside a gesture). Without Web Speech the text field is focused
@@ -58,7 +59,14 @@ export function AskSheet() {
       <div className="flex flex-col items-center pb-2">
         <button
           type="button"
-          onClick={() => (!speech.supported ? input.current?.focus() : speech.listening ? speech.stop() : speech.start())}
+          onClick={() => {
+            if (!speech.supported) input.current?.focus();
+            else if (speech.listening) speech.stop();
+            else {
+              prefix.current = text.trim();
+              speech.start();
+            }
+          }}
           aria-label={speech.listening ? 'Stop listening' : 'Start listening'}
           className={cx('relative mt-2 flex h-24 w-24 items-center justify-center rounded-full', speech.listening ? 'bg-danger text-white' : 'bg-accent text-on-accent', !speech.supported && 'opacity-40')}
         >

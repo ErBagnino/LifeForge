@@ -89,6 +89,9 @@ export async function sendMessage(state: ChatState, input: TurnInput, opts: { fo
   if (!settings) throw new Error('Game not initialised');
   // Quick replies from the basic coach (plan:…, tool:…) stay with the basic coach.
   const basicValue = input.value && !input.value.startsWith('text:');
+  // The AI connection is checked lazily (not at app start): wait for it before the first message.
+  const ai = useAi.getState();
+  if (!opts.forceBasic && settings.coach.ai.enabled && (!ai.checkedAt || ai.ui === 'connecting')) await ai.check();
   if (opts.forceBasic || basicValue || !geminiReady(settings.coach.ai.enabled)) {
     if (input.image) {
       const msg = coachMsg('Photos need Gemini, which isn’t connected right now. You can still log meals manually in Nutrition.', { notice: { kind: 'basic', text: 'Basic coach' } });

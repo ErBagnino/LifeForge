@@ -202,9 +202,14 @@ const STOP = new Set(['segna', 'segnami', 'marca', 'metti', 'mark', 'come', 'as'
  * pending quest whose title matches. Ambiguous or no match → undefined (let the AI or
  * the normal parser answer instead of guessing).
  */
+const NOT_DONE = /\b(non|not|no|didn'?t|did not|haven'?t|have not|hasn'?t|never|mai|niente|nessun[oa]?|devo|dovrei|voglio|vorrei|posso|potrei|should|want|will|going to|se|if|domani|tomorrow|dopo|later|forse|maybe)\b/;
+
 export function completionIntent(raw: string, quests: { id: string; title: string }[]): RuleToolCall | undefined {
   const t = normalize(raw);
   if (!DONE_WORDS.test(t) || t.length > 80) return undefined;
+  // "Non ho fatto il workout", "I didn't do it", "ho fatto il workout?" are not completions:
+  // negations, questions, plans and conditionals go to the full Coach instead.
+  if (NOT_DONE.test(t) || raw.trim().endsWith('?')) return undefined;
   const words = t
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)

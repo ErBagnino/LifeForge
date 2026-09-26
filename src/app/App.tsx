@@ -4,7 +4,6 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import { FxLayer } from '@/components/fx/FxLayer';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { AskSheet } from '@/components/layout/AskSheet';
-import { useAi } from '@/store/aiStore';
 import { Tutorial } from '@/features/tutorial/Tutorial';
 import { TabBar } from '@/components/layout/TabBar';
 import { Skeleton } from '@/components/ui/primitives';
@@ -66,9 +65,6 @@ function Shell() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
-  useEffect(() => {
-    void useAi.getState().check();
-  }, []);
   return (
     <>
       <main id="main" className="mx-auto w-full max-w-[640px]">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { List, Row } from '@/components/ui/forms';
@@ -16,6 +16,10 @@ export default function SettingsScreen() {
   const refresh = useGame((s) => s.refresh);
   const [taps, setTaps] = useState(0);
   const ui = useAi((s) => s.ui);
+  // The AI status is checked when a screen needs it, not at app start.
+  useEffect(() => {
+    void useAi.getState().check();
+  }, []);
   if (!settings) return null;
   const go = (section: string) => () => navigate(`/settings/${section}`);
   const fields = profileFields(settings, clock.today());

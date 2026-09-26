@@ -53,6 +53,10 @@ describe('on-device commands (no AI call)', () => {
     expect(completionIntent('mark reading done', quests)).toBeUndefined(); // two "read" quests → ambiguous, don't guess
     expect(completionIntent('Come sto andando?', quests)).toBeUndefined();
   });
+  it('never completes on a negation, a question or a plan (regression: "Non ho fatto il workout" completed it)', async () => {
+    const { completionIntent } = await import('../ruleIntents');
+    for (const s of ['Non ho fatto il workout', "I didn't do the workout", 'Ho fatto la palestra?', 'Domani faccio la palestra', 'Devo ancora fare la palestra', 'Not done with the workout', 'Se ho tempo faccio la palestra']) expect(completionIntent(s, quests)).toBeUndefined();
+  });
   it('isLocalCommand: targets, reset clarification and completions stay on the device', async () => {
     const { isLocalCommand } = await import('../ruleIntents');
     expect(isLocalCommand('Porta le calorie a 1900 kcal', TODAY, quests)).toBe(true);

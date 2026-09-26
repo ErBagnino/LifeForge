@@ -152,9 +152,9 @@ function UnavailableCard({ title, onRetry, onBasic }: { title: string; onRetry: 
       <div className="text-[11px] font-extrabold tracking-[0.16em] text-warn">{title}</div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Button variant="secondary" icon="refresh" onClick={onRetry}>
-          TRY AGAIN
+          Try again
         </Button>
-        <Button onClick={onBasic}>USE BASIC COACH</Button>
+        <Button onClick={onBasic} className="!px-2 whitespace-nowrap">Basic coach</Button>
       </div>
     </div>
   );
@@ -165,9 +165,9 @@ function QuotaCard({ onBasic, onUsage }: { onBasic: () => void; onUsage: () => v
     <div className="mt-2 rounded-3xl border border-danger/40 bg-surface p-3 shadow-card">
       <div className="text-[11px] font-extrabold tracking-[0.16em] text-danger">GEMINI LIMIT REACHED</div>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <Button onClick={onBasic}>USE BASIC COACH</Button>
+        <Button onClick={onBasic} className="!px-2 whitespace-nowrap">Basic coach</Button>
         <Button variant="secondary" onClick={onUsage}>
-          VIEW USAGE
+          View usage
         </Button>
       </div>
     </div>
@@ -192,7 +192,7 @@ function Bubble({ m, last, busy, h }: { m: ChatMessage; last: boolean; busy: boo
   const pendingCards = (m.actions ?? []).filter((a) => a.status === 'pending' && !a.confirmPhrase && a.permission !== 'destructive');
   const mine = m.role === 'user';
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={cx('flex', mine ? 'justify-end' : 'justify-start')}>
+    <motion.div data-msg={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={cx('flex scroll-mt-3', mine ? 'justify-end' : 'justify-start')}>
       <div className={cx('min-w-0', mine ? 'max-w-[82%]' : 'w-full max-w-[92%]')}>
         <div className={cx('inline-block rounded-3xl px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap', mine ? 'rounded-br-lg bg-accent text-on-accent' : 'rounded-bl-lg bg-surface shadow-card')}>
           {m.photo && <span className="mr-1" aria-label="Photo attached">📷</span>}
@@ -274,7 +274,11 @@ export default function CoachScreen() {
   const [hint, setHint] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const speech = useSpeech(settings?.coach.voiceLang ?? '', (t) => setText(t));
+  // Dictation is appended to what was already typed (snapshot when listening starts).
+  const prefix = useRef('');
+  const speech = useSpeech(settings?.coach.voiceLang ?? '', (t) => setText(prefix.current ? `${prefix.current} ${t}` : t));
+  // On a phone the return key adds a new line (Send is the button); with a keyboard, Enter sends.
+  const touch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
   useEffect(() => {
     void loadChat().then(setChat);
@@ -292,8 +296,14 @@ export default function CoachScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chat]);
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
-  }, [chat?.messages.length, busy]);
+    const box = scroller.current;
+    if (!box) return;
+    // A long Coach reply is shown from its first line; otherwise follow the bottom of the chat.
+    const last = chat?.messages[chat.messages.length - 1];
+    const el = last && last.role !== 'user' && !busy ? box.querySelector<HTMLElement>(`[data-msg="${last.id}"]`) : null;
+    if (el && el.offsetHeight > box.clientHeight * 0.7) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    else box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+  }, [chat?.messages.length, busy, chat?.messages]);
   useEffect(() => {
     const el = input.current;
     if (!el) return;
@@ -365,7 +375,14 @@ export default function CoachScreen() {
       return;
     }
     if (speech.listening) speech.stop();
-    else speech.start();
+    else {
+      prefix.current = text.trim();
+      speech.start();
+    }
+  };
+  // Buttons next to the field must not steal its focus, or iOS closes the keyboard on every send.
+  const keepFocus = (e: React.PointerEvent) => {
+    if (document.activeElement === input.current) e.preventDefault();
   };
 
   return (
@@ -440,6 +457,7 @@ export default function CoachScreen() {
           <button
             type="button"
             onClick={mic}
+            onPointerDown={keepFocus}
             aria-label={speech.listening ? 'Stop voice input' : 'Voice input'}
             aria-pressed={speech.listening}
             className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full', speech.listening ? 'bg-danger text-white' : 'bg-surface-2 text-fg')}
@@ -462,8 +480,9 @@ export default function CoachScreen() {
             value={text}
             rows={1}
             onChange={(e) => setText(e.target.value)}
+            enterKeyHint={touch ? 'enter' : 'send'}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send(text);
               }
@@ -472,7 +491,7 @@ export default function CoachScreen() {
             aria-label="Message the Coach"
             className="min-h-11 min-w-0 flex-1 resize-none rounded-3xl border border-line bg-surface px-4 py-[10px] text-[16px] leading-snug outline-none focus:border-accent"
           />
-          <button type="submit" disabled={(!text.trim() && !photo) || busy} aria-label="Send" className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors', text.trim() || photo ? 'bg-accent text-on-accent' : 'bg-surface-2 text-faint')}>
+          <button type="submit" onPointerDown={keepFocus} disabled={(!text.trim() && !photo) || busy} aria-label="Send" className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors', text.trim() || photo ? 'bg-accent text-on-accent' : 'bg-surface-2 text-faint')}>
             <Icon name="send" size={20} strokeWidth={2.4} />
           </button>
         </form>
