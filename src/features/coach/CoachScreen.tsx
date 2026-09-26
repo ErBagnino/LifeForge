@@ -360,7 +360,7 @@ export default function CoachScreen() {
 
   const mic = () => {
     if (!speech.supported) {
-      setHint('Voice input isn’t available in this browser. Tip: use the 🎙️ key on the iPhone keyboard.');
+      setHint('Tap the 🎙️ key on the iPhone keyboard to dictate.');
       input.current?.focus();
       return;
     }

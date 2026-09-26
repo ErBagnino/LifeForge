@@ -30,20 +30,19 @@ export function AskSheet() {
   const navigate = useNavigate();
   const settings = useGame((s) => s.settings);
   const [text, setText] = useState('');
-  const started = useRef(false);
+  const input = useRef<HTMLTextAreaElement>(null);
   const speech = useSpeech(settings?.coach.voiceLang ?? '', (t) => setText(t));
 
+  // The microphone only starts from a tap on the big button (iOS blocks or hangs speech
+  // recognition started outside a gesture). Without Web Speech the text field is focused
+  // so the keyboard's 🎙️ dictation key is one tap away.
   useEffect(() => {
     if (!open) {
-      started.current = false;
       speech.stop();
       return;
     }
     setText('');
-    if (listen && speech.supported && !started.current) {
-      started.current = true;
-      speech.start();
-    }
+    if (listen && !speech.supported) setTimeout(() => input.current?.focus(), 350);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, listen]);
 
@@ -59,8 +58,7 @@ export function AskSheet() {
       <div className="flex flex-col items-center pb-2">
         <button
           type="button"
-          onClick={() => (speech.listening ? speech.stop() : speech.start())}
-          disabled={!speech.supported}
+          onClick={() => (!speech.supported ? input.current?.focus() : speech.listening ? speech.stop() : speech.start())}
           aria-label={speech.listening ? 'Stop listening' : 'Start listening'}
           className={cx('relative mt-2 flex h-24 w-24 items-center justify-center rounded-full', speech.listening ? 'bg-danger text-white' : 'bg-accent text-on-accent', !speech.supported && 'opacity-40')}
         >
@@ -68,11 +66,12 @@ export function AskSheet() {
           <Icon name="mic" size={40} />
         </button>
         <div className="mt-3 text-[13px] font-extrabold tracking-[0.18em] text-muted" aria-live="polite">
-          {speech.listening ? 'LISTENING…' : speech.supported ? 'TAP TO SPEAK' : 'TYPE YOUR REQUEST'}
+          {speech.listening ? 'LISTENING… TAP TO STOP' : speech.supported ? 'TAP TO SPEAK' : 'TYPE OR DICTATE'}
         </div>
-        {!speech.supported && <p className="mt-1 text-center text-[12px] text-muted">Voice input isn’t available in this browser. Tip: use the 🎙️ key on the iPhone keyboard.</p>}
+        {!speech.supported && <p className="mt-1 text-center text-[12px] text-muted">Tap the field, then the 🎙️ key on the iPhone keyboard to dictate.</p>}
         {speech.error && <p className="mt-1 text-center text-[12px] text-danger">{speech.error}</p>}
         <textarea
+          ref={input}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={2}

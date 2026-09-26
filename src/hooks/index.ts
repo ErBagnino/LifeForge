@@ -148,38 +148,108 @@ interface SpeechRecognitionLike {
   onresult: ((e: SpeechResultEvent) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
+  onaudiostart?: (() => void) | null;
+  onstart?: (() => void) | null;
   start(): void;
   stop(): void;
+  abort?(): void;
 }
 
+/**
+ * iOS Home Screen apps: WebKit's speech recognition there can hang without ever firing
+ * `end` or `error` and freeze the page, so it is treated as unavailable and the
+ * keyboard's 🎙️ dictation key is used instead (reliable everywhere on iPhone).
+ */
+export function isIosStandalone(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = (navigator as { standalone?: boolean }).standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+  return ios && !!standalone;
+}
+
+/** Set after a recognizer failed in a way that will repeat (permission, service): stop offering it. */
+let speechBroken = false;
+
 function speechCtor(): (new () => SpeechRecognitionLike) | undefined {
-  if (typeof window === 'undefined') return undefined;
+  if (typeof window === 'undefined' || speechBroken || isIosStandalone()) return undefined;
   const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
+/** Only one recognizer in the whole app at a time (Ask sheet, Coach and field mics share the microphone). */
+let activeRec: SpeechRecognitionLike | null = null;
+const kill = (r: SpeechRecognitionLike | null) => {
+  if (!r) return;
+  r.onresult = r.onend = r.onerror = null;
+  try {
+    if (r.abort) r.abort();
+    else r.stop();
+  } catch {
+    // already stopped
+  }
+  if (activeRec === r) activeRec = null;
+};
+
+const START_TIMEOUT_MS = 6000; // no audio by then → give up instead of hanging
+const MAX_SESSION_MS = 20000;
+const SILENCE_MS = 3500;
+
 /**
- * Voice input via the Web Speech API where the browser offers it. Elsewhere
- * (e.g. some iOS home-screen modes) `supported` is false and the keyboard's
- * dictation key is the fallback.
+ * Voice input via the Web Speech API where the browser offers it. It only starts from
+ * a tap, never runs longer than 20 s, gives up if the microphone never starts, and stops
+ * after a short silence, so it can never leave the app stuck in "listening". Where it isn't
+ * available (e.g. iOS Home Screen apps) `supported` is false and the keyboard's dictation
+ * key is the fallback.
  */
 export function useSpeech(lang: string, onText: (text: string, final: boolean) => void) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rec = useRef<SpeechRecognitionLike | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const silence = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cb = useRef(onText);
   useEffect(() => {
     cb.current = onText;
   }, [onText]);
   const Ctor = speechCtor();
+
+  const clearTimers = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    clearTimeout(silence.current);
+  };
+  const finish = (message?: string) => {
+    clearTimers();
+    kill(rec.current);
+    rec.current = null;
+    setListening(false);
+    if (message) setError(message);
+  };
+
   const start = () => {
     if (!Ctor) return;
     setError(null);
-    const r = new Ctor();
+    clearTimers();
+    kill(activeRec);
+    let r: SpeechRecognitionLike;
+    try {
+      r = new Ctor();
+    } catch {
+      speechBroken = true;
+      setError('Voice input isn’t available here. Use the 🎙️ key on the keyboard.');
+      return;
+    }
     r.lang = lang || navigator.language || 'it-IT';
     r.interimResults = true;
     r.continuous = false;
+    let heard = false;
+    const alive = () => {
+      heard = true;
+    };
+    r.onstart = alive;
+    r.onaudiostart = alive;
     r.onresult = (e) => {
+      heard = true;
       let text = '';
       let final = false;
       for (let i = 0; i < e.results.length; i++) {
@@ -187,21 +257,40 @@ export function useSpeech(lang: string, onText: (text: string, final: boolean) =
         final = e.results[i].isFinal;
       }
       cb.current(text, final);
+      clearTimeout(silence.current);
+      if (final) finish();
+      else silence.current = setTimeout(() => finish(), SILENCE_MS);
     };
-    r.onerror = (e) => setError(e.error === 'not-allowed' ? 'Microphone permission denied.' : 'Voice input stopped.');
-    r.onend = () => setListening(false);
+    r.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        speechBroken = true;
+        finish('Microphone or speech recognition not allowed. Use the 🎙️ key on the keyboard.');
+      } else if (e.error === 'no-speech' || e.error === 'aborted') finish();
+      else finish('Voice input stopped. You can type or use the 🎙️ key on the keyboard.');
+    };
+    r.onend = () => finish();
     rec.current = r;
+    activeRec = r;
     try {
       r.start();
       setListening(true);
+      timers.current.push(
+        setTimeout(() => {
+          if (!heard) finish('The microphone didn’t start. Use the 🎙️ key on the keyboard.');
+        }, START_TIMEOUT_MS),
+        setTimeout(() => finish(), MAX_SESSION_MS),
+      );
     } catch {
-      setListening(false);
+      finish('Voice input isn’t available right now.');
     }
   };
-  const stop = () => {
-    rec.current?.stop();
-    setListening(false);
-  };
-  useEffect(() => () => rec.current?.stop(), []);
+  const stop = () => finish();
+  useEffect(
+    () => () => {
+      clearTimers();
+      kill(rec.current);
+    },
+    [],
+  );
   return { supported: !!Ctor, listening, error, start, stop };
 }
