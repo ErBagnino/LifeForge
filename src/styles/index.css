@@ -215,13 +215,28 @@ html.kb-open .hide-on-kb {
   background-size: 400% 100%;
   animation: lf-shimmer 1.4s ease infinite;
 }
+@keyframes lf-heartbeat {
+  0%, 60%, 100% { transform: scale(1); }
+  20% { transform: scale(1.22); }
+  40% { transform: scale(0.96); }
+}
+.lf-pulse {
+  animation: lf-heartbeat 1.2s ease-in-out infinite;
+  display: inline-block;
+}
+/* A hot streak flickers faster. */
+.lf-flame-hot {
+  animation-duration: 0.8s;
+}
 @media (prefers-reduced-motion: reduce) {
   .lf-flame,
+  .lf-pulse,
   .lf-skeleton {
     animation: none;
   }
 }
 .reduce-motion .lf-flame,
+.reduce-motion .lf-pulse,
 .reduce-motion .lf-skeleton {
   animation: none;
 }

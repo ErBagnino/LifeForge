@@ -13,7 +13,7 @@ export interface WorldEventInput {
   weekday: number;
   streak: number;
   /** Last 7 game days (today included). */
-  week: { workouts: number; waterDays: number; activeDays: number; successDays: number };
+  week: { workouts: number; waterDays: number; activeDays: number; successDays: number; /** Game days of the window that exist (new players have fewer than 7). */ days?: number };
   /** Completed quests per category, last 7 days. */
   categories: Partial<Record<ActivityCategory, number>>;
   buildings: Pick<Building, 'id' | 'level'>[];
@@ -42,7 +42,7 @@ export function worldEvents(input: WorldEventInput): WorldEvent[] {
   if (c('cleaning') + c('home') + c('order') >= 4) out.push({ id: 'spotless', icon: '✨', title: 'Spotless house', text: 'Everything sparkles. Even the basement.', because: `${c('cleaning') + c('home') + c('order')} home quests this week` });
   if (c('animal_care') >= 5) out.push({ id: 'happy_pet', icon: '🐾', title: 'A very happy pet', text: 'Your companion is curled up in the sunniest spot.', because: `${c('animal_care')} pet-care quests this week` });
   if (input.weekday === 0 || input.weekday === 6) out.push({ id: 'weekend_market', icon: '🧺', title: 'Weekend market', text: 'Stalls pop up outside. A good day to spend some coins in the shop.', because: 'it’s the weekend' });
-  if (!out.length && input.week.activeDays <= 1) out.push({ id: 'quiet_house', icon: '🕊️', title: 'A quiet week', text: 'The house waits patiently. Nothing is lost — one small quest wakes it up.', because: 'few active days lately' });
+  if (!out.length && (input.week.days ?? 7) >= 5 && input.week.activeDays <= 1) out.push({ id: 'quiet_house', icon: '🕊️', title: 'A quiet week', text: 'The house waits patiently. Nothing is lost — one small quest wakes it up.', because: 'few active days lately' });
   return out.slice(0, 3);
 }
 

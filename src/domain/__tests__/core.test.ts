@@ -256,3 +256,36 @@ describe('pet emoji setting', () => {
     expect(questIcon('🐾', 'animal_care', s)).toBe('🐾');
   });
 });
+
+describe('score explanation', () => {
+  it('splits the score into contributions, names strongest/weakest and what can still change', async () => {
+    const { explainScore } = await import('../score');
+    const b = {
+      components: [
+        { key: 'core' as const, weight: 40, ratio: 1 },
+        { key: 'hydration' as const, weight: 10, ratio: 0.5 },
+        { key: 'physical' as const, weight: 20, ratio: 0.25 },
+        { key: 'consistency' as const, weight: 10, ratio: 0.2 },
+        { key: 'nutrition' as const, weight: 20, ratio: null },
+      ],
+      base: 65,
+      bonus: 0,
+      total: 65,
+    };
+    const e = explainScore(b, 70);
+    expect(e.contributions.find((c) => c.key === 'core')).toMatchObject({ worth: 50, points: 50, left: 0 });
+    expect(e.contributions.reduce((s, c) => s + c.worth, 0)).toBeCloseTo(100, 0);
+    expect(e.notApplicable).toEqual(['Nutrition']);
+    expect(e.strongest?.key).toBe('core');
+    expect(e.weakest?.key).toBe('consistency');
+    expect(e.canStillChange.map((c) => c.key)).toEqual(['physical', 'hydration']); // consistency can't change today
+    expect(e.toThreshold).toBe(5);
+    expect(e.reachable).toBe(90); // 65 + 18.8 + 6.3 → consistency stays
+  });
+  it('no strongest/weakest when everything is equal', async () => {
+    const { explainScore } = await import('../score');
+    const e = explainScore({ components: [{ key: 'core', weight: 1, ratio: 0 }, { key: 'hydration', weight: 1, ratio: 0 }], base: 0, bonus: 0, total: 0 }, 70);
+    expect(e.strongest).toBeUndefined();
+    expect(e.reachable).toBe(100);
+  });
+});

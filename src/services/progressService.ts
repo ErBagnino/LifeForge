@@ -127,6 +127,7 @@ export async function loadWorldExtras(): Promise<{ events: WorldEvent[]; collect
       waterDays: target > 0 ? logs.filter((l) => (l.metrics.water ?? 0) >= target).length : 0,
       activeDays: logs.filter((l) => l.core.done + l.important.done + l.optional.done > 0 || l.workouts > 0).length,
       successDays: logs.filter((l) => l.closed && l.success).length,
+      days: logs.length,
     },
     categories,
     buildings,

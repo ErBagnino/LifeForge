@@ -121,3 +121,73 @@ export const SCORE_COMPONENT_LABELS: Record<ScoreComponent['key'], string> = {
   routine: 'Routines',
   consistency: 'Consistency',
 };
+
+export interface ScoreContribution {
+  key: ScoreComponent['key'];
+  label: string;
+  ratio: number;
+  /** Share of the 100 points this component is worth today (after redistributing non-applicable ones). */
+  worth: number;
+  /** Points earned so far. */
+  points: number;
+  /** Points still available today (0 for history-based components). */
+  left: number;
+  changeable: boolean;
+}
+
+export interface ScoreExplanation {
+  contributions: ScoreContribution[];
+  notApplicable: string[];
+  strongest?: ScoreContribution;
+  weakest?: ScoreContribution;
+  /** Biggest opportunities left today, largest first. */
+  canStillChange: (ScoreContribution & { hint: string })[];
+  /** Points missing to reach the streak line (0 when already there). */
+  toThreshold: number;
+  /** Highest score still reachable today if everything changeable is completed. */
+  reachable: number;
+}
+
+const HINTS: Record<ScoreComponent['key'], string> = {
+  core: 'Finish your core quests',
+  important: 'Complete important quests',
+  optional: 'Do a side quest or two',
+  physical: 'Walk more or complete your workout',
+  nutrition: 'Log meals close to your calorie and protein targets',
+  hydration: 'Drink water up to your target',
+  routine: 'Complete today’s routine',
+  consistency: 'Built from the last 7 days',
+};
+
+/** Human explanation of a score breakdown: what each part is worth, what helped, what can still move. */
+export function explainScore(b: ScoreBreakdown, threshold: number): ScoreExplanation {
+  const applicable = b.components.filter((c) => c.ratio !== null && c.weight > 0);
+  const totalWeight = applicable.reduce((s, c) => s + c.weight, 0) || 1;
+  const contributions: ScoreContribution[] = applicable.map((c) => {
+    const worth = (c.weight / totalWeight) * 100;
+    const ratio = c.ratio ?? 0;
+    const changeable = c.key !== 'consistency';
+    return { key: c.key, label: SCORE_COMPONENT_LABELS[c.key], ratio, worth: round1(worth), points: round1(worth * ratio), left: changeable ? round1(worth * (1 - ratio)) : 0, changeable };
+  });
+  const ranked = [...contributions].filter((c) => c.worth >= 1).sort((a, b) => b.ratio - a.ratio || b.worth - a.worth);
+  const distinct = ranked.length > 1 && ranked[0].ratio !== ranked[ranked.length - 1].ratio;
+  const canStillChange = contributions
+    .filter((c) => c.changeable && c.left >= 1)
+    .sort((a, b) => b.left - a.left)
+    .slice(0, 3)
+    .map((c) => ({ ...c, hint: HINTS[c.key] }));
+  const reachable = Math.min(100, Math.round(b.base + contributions.reduce((s, c) => s + c.left, 0) + b.bonus));
+  return {
+    contributions,
+    notApplicable: b.components.filter((c) => c.ratio === null).map((c) => SCORE_COMPONENT_LABELS[c.key]),
+    strongest: distinct ? ranked[0] : undefined,
+    weakest: distinct ? ranked[ranked.length - 1] : undefined,
+    canStillChange,
+    toThreshold: Math.max(0, threshold - b.total),
+    reachable,
+  };
+}
+
+function round1(n: number) {
+  return Math.round(n * 10) / 10;
+}

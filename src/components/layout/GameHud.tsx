@@ -8,16 +8,17 @@ import { formatCompact, formatInt } from '@/utils/format';
 import { Avatar } from '../game/Avatar';
 import { Flame } from '../game/bits';
 import { Icon } from '../ui/Icon';
+import { cx } from '../ui/primitives';
 import { AnimatedNumber, ProgressBar } from '../ui/progress';
 import { Sheet } from '../ui/Sheet';
 import { Row, List } from '../ui/forms';
 import { InfoTip, type InfoKey } from '../ui/InfoTip';
 import { openAsk } from './AskSheet';
 
-function Meter({ icon, value, max, color, label, id, tip }: { icon: string; value: number; max: number; color: string; label: string; id?: string; tip?: InfoKey }) {
+function Meter({ icon, value, max, color, label, id, tip, alert }: { icon: string; value: number; max: number; color: string; label: string; id?: string; tip?: InfoKey; alert?: boolean }) {
   return (
     <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2 py-1.5 min-[360px]:px-2.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
-      <span aria-hidden className="text-[14px]">
+      <span aria-hidden className={cx('text-[14px]', alert && 'lf-pulse')}>
         {icon}
       </span>
       <div className="min-w-0 flex-1">
@@ -74,10 +75,10 @@ export function GameHud() {
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" tip="hp" />
+        <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" tip="hp" alert={player.hp <= 30} />
         <Meter icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" tip="energy" />
         <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`Streak ${player.streak.current} days`}>
-          <Flame size={16} dim={player.streak.current === 0} />
+          <Flame size={16} dim={player.streak.current === 0} hot={player.streak.current >= 7} />
           <span className="num text-[15px] font-bold">{player.streak.current}</span>
         </div>
         <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`${formatInt(player.coins)} coins, open shop`}>

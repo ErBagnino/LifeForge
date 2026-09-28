@@ -38,7 +38,7 @@ export function NextActionCard({ onStart, onOpen }: { onStart: (q: Quest) => voi
     const allDone = today.quests.length > 0 && today.quests.every((q) => q.status !== 'pending' || q.hidden || q.goal);
     return (
       <div className="mt-3 rounded-3xl bg-gradient-to-br from-success/90 to-success p-5 text-white shadow-card">
-        <div className="text-[12px] font-extrabold tracking-widest opacity-80">NEXT ACTION</div>
+        <div className="text-[12px] font-extrabold tracking-widest opacity-80">RIGHT NOW · NEXT ACTION</div>
         <div className="mt-1 text-[20px] font-bold">{allDone ? 'Board cleared. Legend behaviour. 🏆' : 'Nothing actionable right now.'}</div>
         <div className="mt-1 text-[14px] opacity-85">{allDone ? 'Rest, or grab something from the library for bonus XP.' : 'Snoozed quests will come back on time.'}</div>
       </div>
@@ -50,7 +50,7 @@ export function NextActionCard({ onStart, onOpen }: { onStart: (q: Quest) => voi
       <div className="pointer-events-none absolute -top-6 -right-4 text-[110px] opacity-15" aria-hidden>
         {q.icon}
       </div>
-      <div className="text-[12px] font-extrabold tracking-widest opacity-85">NEXT ACTION</div>
+      <div className="text-[12px] font-extrabold tracking-widest opacity-85">RIGHT NOW · NEXT ACTION</div>
       <button type="button" className="mt-1 block text-left" onClick={() => onOpen(q)}>
         <div className="text-[22px] leading-tight font-extrabold">
           {q.icon} {resolveText(q.title, settings.profile.petName)}

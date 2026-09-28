@@ -159,6 +159,7 @@ describe('world events and collections', () => {
     expect(ev.every((e) => e.because.length > 0)).toBe(true);
     expect(worldEvents({ ...base, weekday: 6 }).map((e) => e.id)).toEqual(['weekend_market']);
     expect(worldEvents({ ...base, week: { ...base.week, activeDays: 0 } }).map((e) => e.id)).toEqual(['quiet_house']);
+    expect(worldEvents({ ...base, week: { ...base.week, activeDays: 0, days: 1 } })).toEqual([]); // a brand-new player is not 'quiet'
   });
   it('collections count only earned items and complete honestly', async () => {
     const { worldCollections } = await import('../world');

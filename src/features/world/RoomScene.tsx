@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { Avatar } from '@/components/game/Avatar';
 import { visibleFurniture } from '@/domain/tycoon';
 import type { AvatarConfig, Building, Cosmetic } from '@/types';
+import { clock } from '@/services/clock';
 
 function skyFor(hour: number): string {
   if (hour >= 6 && hour < 17) return 'linear-gradient(#8fd3ff, #d9f1ff)';
@@ -65,8 +66,43 @@ export function RoomScene({
           <Avatar config={avatar} size={Math.round(height * 0.38)} />
         </motion.div>
       )}
+      <Ambient building={building} night={night} outdoor={outdoor} height={height} />
       {night && !outdoor && <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,200,120,0.25),rgba(10,10,40,0.25))]" />}
       {night && outdoor && <div className="pointer-events-none absolute inset-0 bg-black/20" />}
+    </div>
+  );
+}
+
+const RECENT_MS = 24 * 3600_000;
+
+/** Small ambient life per room (Motion honours the reduced-motion preference). */
+function Ambient({ building, night, outdoor, height }: { building: Building; night: boolean; outdoor: boolean; height: number }) {
+  const fresh = building.upgradedAt !== undefined && clock.now() - building.upgradedAt < RECENT_MS;
+  const size = Math.round(height * 0.13);
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {outdoor && !night && (
+        <motion.span className="absolute" style={{ top: '30%', left: '20%', fontSize: size }} animate={{ x: [0, 40, 80, 40, 0], y: [0, -10, 4, -6, 0] }} transition={{ repeat: Infinity, duration: 9, ease: 'easeInOut' }}>
+          🦋
+        </motion.span>
+      )}
+      {outdoor &&
+        night &&
+        ['25% 35%', '60% 25%', '78% 45%'].map((p, i) => (
+          <motion.span key={p} className="absolute text-yellow-200" style={{ left: p.split(' ')[0], top: p.split(' ')[1], fontSize: size * 0.8 }} animate={{ opacity: [0.1, 1, 0.1] }} transition={{ repeat: Infinity, duration: 2.2, delay: i * 0.7 }}>
+            ✦
+          </motion.span>
+        ))}
+      {building.id === 'kitchen' && (
+        <motion.span className="absolute" style={{ bottom: '48%', left: '46%', fontSize: size }} animate={{ y: [0, -8], opacity: [0.8, 0] }} transition={{ repeat: Infinity, duration: 2.6, ease: 'easeOut' }}>
+          ♨️
+        </motion.span>
+      )}
+      {fresh && (
+        <motion.span className="absolute top-1.5 right-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-on-accent" initial={{ scale: 0 }} animate={{ scale: [0, 1.2, 1] }} transition={{ duration: 0.6 }}>
+          ✨ New
+        </motion.span>
+      )}
     </div>
   );
 }

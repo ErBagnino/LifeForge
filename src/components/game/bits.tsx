@@ -27,9 +27,9 @@ export function CategoryChip({ category }: { category: ActivityCategory }) {
   );
 }
 
-export function Flame({ size = 18, dim }: { size?: number; dim?: boolean }) {
+export function Flame({ size = 18, dim, hot }: { size?: number; dim?: boolean; hot?: boolean }) {
   return (
-    <span className={cx(!dim && 'lf-flame', dim && 'opacity-40 grayscale')} style={{ fontSize: size, lineHeight: 1 }} aria-hidden>
+    <span className={cx(!dim && 'lf-flame', !dim && hot && 'lf-flame-hot', dim && 'opacity-40 grayscale')} style={{ fontSize: size, lineHeight: 1 }} aria-hidden>
       🔥
     </span>
   );

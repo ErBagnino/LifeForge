@@ -204,11 +204,10 @@ export default function TodayScreen() {
         </Card>
       )}
 
-      <ScoreCard />
       {context && !context.openWork && (context.view.focus.length > 0 || context.view.state === 'SLEEP' || context.view.state === 'WIND_DOWN') ? <FocusCard onStart={start} onOpen={setSheet} /> : <NextActionCard onStart={start} onOpen={setSheet} />}
-      <SuggestionCards />
 
-      <div className="mt-5 flex items-center justify-between gap-2">
+      <HomeSection>Today</HomeSection>
+      <div className="mt-1 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-[20px] font-bold">Quests</h2>
           {momentumText && (
@@ -262,11 +261,6 @@ export default function TodayScreen() {
               {renderList(groups.important)}
             </Collapsible>
           )}
-          {groups.side.length > 0 && (
-            <Collapsible id="optional" title="Optional & side quests" meta={groups.side.length} defaultOpen={sideOpen}>
-              {renderList(groups.side)}
-            </Collapsible>
-          )}
           {groups.done.length > 0 && (
             <Collapsible id="done" title="Done" meta={groups.done.filter((q) => q.status === 'completed').length} defaultOpen={false}>
               {renderList(groups.done)}
@@ -275,7 +269,17 @@ export default function TodayScreen() {
         </>
       )}
 
+      {((view === 'list' && groups.side.length > 0) || settings.leisure.enabled) && <HomeSection>Optional</HomeSection>}
+      {view === 'list' && groups.side.length > 0 && (
+        <Collapsible id="optional" title="Side quests" meta={groups.side.length} defaultOpen={sideOpen} className="!mt-1">
+          {renderList(groups.side)}
+        </Collapsible>
+      )}
+      <SuggestionCards />
       <PlayTimeCard />
+
+      <HomeSection>Progress</HomeSection>
+      <ScoreCard />
       <NutritionGlance />
 
       <Collapsible id="quick" title="Quick log" className="!mt-4">
@@ -320,4 +324,9 @@ export default function TodayScreen() {
       )}
     </Screen>
   );
+}
+
+/** Home hierarchy label: RIGHT NOW → TODAY → OPTIONAL → PROGRESS. */
+function HomeSection({ children }: { children: string }) {
+  return <h2 className="mt-6 px-1 text-[12px] font-extrabold tracking-[0.14em] text-muted uppercase">{children}</h2>;
 }
