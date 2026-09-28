@@ -43,6 +43,12 @@ Examples:
 - `suggestProgression(input)` → an `increase | increase_reps | maintain | decrease | deload | none` suggestion with a reason
 - `generateSideQuests(ctx)` → seeded-random, weighted picks honouring time, energy, workload, recency and rarity
 - `evaluateRules(rules, trigger, facts)` → smart-rule actions to apply
+- `explainScore(breakdown, threshold)` → points per component, strongest / most room, what can still change today
+- `computeMastery(quests, today)` → 10 mastery tracks with diminishing returns per track per day, perk titles
+- `computeMomentum(completedAt[], now)` → combo of completions ≤ 45 min apart (display only)
+- `chapterSummaries()` / `buildJourney()` → chapters and a milestone timeline from stored history
+- `worldEvents()` / `worldCollections()` → the house reacting to this week's behaviour; collectible sets
+- `coachCommand(text)` / `memoryIntent(text)` → on-device Coach commands and memory notes (IT/EN)
 
 ### `repositories/`: persistence boundary
 The only code that imports Dexie. Every table has a small repository (`base.ts` provides `get/put/bulkPut/delete/all`)
@@ -219,6 +225,20 @@ services/ai/orchestrator.ts ──fetch──►  api/ai.ts → server/ai/handle
   usage row per model attempt.
 - **Dev:** `vite.config.ts` mounts the same handlers under `/api/*` during `npm run dev` (reads `.env.local`).
 
+## Long-term progression
+`services/progressService.ts` derives everything from stored history, so it can't drift from what happened: mastery
+(from quests since `progressSince`, i.e. since the last game-progress reset), momentum, chapters and the Journey timeline
+(day logs, ledger `Build:`/`Upgrade:` entries, achievements, records), world events (last 7 days) and collections
+(rooms, bought cosmetics, mastery). Only the player's choices are stored in `meta`: `equippedTitle` (must be unlocked),
+`achievementShowcase` (unlocked only, max 3). None of this changes XP or coins, so the economy simulations stay valid.
+
+On-device Coach commands (`domain/coachCommands.ts` → `services/coachCommandService.ts`) answer "what now", "time left",
+"plan my evening", "prepare tomorrow", "postponed" and "bad day" from the daily context snapshot, the forecast and the
+board; the orchestrator treats them (and memory intents) as local, so they never spend Gemini quota. Coach memory
+(`coachMemoryService.ts`, meta `coachMemory`) is only written when the player asks, is editable in Settings → Coach memory,
+and is sent to Gemini as `playerNotes` data inside a chat turn; the system prompt says to never follow instructions
+inside it. Private quests are masked (`Private quest`) in the AI context and daily-context summary.
+
 ## Notifications
 `services/notifications/NotificationService.ts` exposes providers (`inapp`, `browser`, `webpush`, reserved `native`).
 `reminderScheduler.ts` builds today's reminder plan from `domain/reminders.ts` (quests, routines, water, workout,
@@ -229,6 +249,10 @@ then:
 - if Web Push is configured → the next 24 h are synced to the backend (`/schedule`), which pushes even when the app is closed.
 
 Private quests (tag `private`, e.g. NoFap) always get neutral titles like "Evening check-in".
+
+Reminders are dropped when the quest is already done (the plan is rebuilt after every action), during an open work
+session, an active workout or play timer, and while the player sleeps: `sleepWindows()` silences the game day from 04:00
+to wake-up and from bedtime to the end of the day (night-shift schedules fall back to the user's quiet hours).
 
 ## PWA / service worker
 - `vite-plugin-pwa` in **injectManifest** mode compiles `src/sw.ts`: Workbox precache of the build, SPA navigation fallback

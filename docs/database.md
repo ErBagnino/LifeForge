@@ -8,7 +8,7 @@ Types live in `src/types/*`.
 
 | Table | Primary key | Indexes | Contents |
 | --- | --- | --- | --- |
-| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `adventureStart` (Day 1, drives the first-week ramp), `leisureTimer` (running play-time timer), `coachChat` (Coach history, pending question, short Gemini transcript, paused AI turn), `tutorial` (tour done), `workSession` (open START WORK timer `{start}`), `lastVisitDate` / `previousVisitDate` (for "Welcome back"). |
+| `meta` | `key` | | Key/value: `seedVersion`, `currentDate` (last started game day), `adventureStart` (Day 1, drives the first-week ramp), `leisureTimer` (running play-time timer), `coachChat` (Coach history, pending question, short Gemini transcript, paused AI turn), `tutorial` (tour done), `workSession` (open START WORK timer `{start}`), `lastVisitDate` / `previousVisitDate` (for "Welcome back"), `progressSince` (date of the last game-progress reset: mastery counts from here), `equippedTitle` (perk title id, e.g. `mind:5`), `achievementShowcase` (up to 3 achievement ids), `coachMemory` (Coach memory notes `{id, text, createdAt, updatedAt}`, max 30 × 200 chars). |
 | `player` | `id` | | Single row `"me"`: xp, coins, hp, energy, stats, streak state, inventory (freezes, revives, rerolls), boosts, status effects, recovery mode, avatar, unlocked features. |
 | `settings` | `id` | | Single row `"settings"`: profile (goals, focus, optional future goals), rhythm (wake/sleep, busy blocks, training availability), **work** (`status` + versioned `schedules`, every day `off`/`unknown`/`work` with optional start/end/break/duration/approximate), **known** (`set`/`not_set`/`unknown` per field), **exceptions** (no gym, more/less time, keep-all, push, time-boxed), **load** mode, **coach** (voice language, voice on/off, personality, AI toggles: Gemini, Food Vision, Save Food Photos, usage tracking, optional limits and thresholds — never an API key), body & nutrition, steps, hydration, leisure budget, safety bounds, notifications, appearance, difficulty, the editable `rules`, and `schemaVersion`. Normalised on read. |
 | `activities` | `id` | `category, tier, active` | The activity library (123 seeded): tier, recurrence, difficulty, duration, time of day, metric & mode, stats, tags, scalability. Editable in Admin. |
@@ -47,6 +47,9 @@ and streaks), `[date+type]` / `[type+date]` (daily metric totals and trends).
   day log, ledger, counters and achievements, so a quest completion is all-or-nothing.
 - **Transaction hygiene.** Inside `withTransaction`, only Dexie operations may be awaited: no `fetch`, timers or
   dynamic `import()`. Otherwise IndexedDB auto-commits early and Dexie loses its transaction zone.
+- **Long-term progression is derived.** Mastery, momentum, chapters, the Journey timeline, world events and
+  collections are computed on the fly (`progressService`) from quests, day logs, ledger, achievements and records —
+  only the player's choices (equipped title, showcase, memory notes) are stored, in `meta`.
 - **Derived data isn't stored twice.** Aggregates (weekly averages, category balance, trends) are computed from `dayLogs`
   and `metrics` by `statsRepository` / `insightsService`.
 

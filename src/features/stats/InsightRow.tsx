@@ -3,8 +3,8 @@ import type { Insight } from '@/domain/coach';
 /** One insight; tap "Why?" to see the data and time window it was computed from. */
 export function InsightRow({ insight }: { insight: Insight }) {
   return (
-    <details className="group flex gap-3">
-      <summary className="flex cursor-pointer list-none gap-3 [&::-webkit-details-marker]:hidden">
+    <details className="group">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
         <span className="text-[20px]" aria-hidden>
           {insight.icon}
         </span>

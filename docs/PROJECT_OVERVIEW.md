@@ -285,6 +285,26 @@ Tutte le costanti stanno in `src/data/defaultRules.ts` e sono modificabili in Ad
   (solo se i dati le distinguono davvero), raccomandazioni solo dopo almeno 2 giornate complete, previsione di domani
   coerente con la rampa della prima settimana.
 
+### 10.1 Progressione a lungo termine (tutto derivato da dati reali)
+- **Maestria** in 10 tracce (Forza, Resistenza, Nutrizione, Idratazione, Cura di sé, Casa, Compagno, Mente, Recupero,
+  Relazioni) che crescono con le quest completate. **Rendimenti decrescenti** per traccia e per giorno (1, 0,6, 0,35, 0,2,
+  0,1…): conviene presentarsi più giorni che fare tutto in un pomeriggio. Livelli 0–20; a 5/10/15/20 si sblocca un
+  **titolo** cosmetico equipaggiabile (Mastery screen, `/mastery`). Non cambia XP né monete.
+- **Momentum**: quest completate a meno di 45 minuti l'una dall'altra formano una combo ("Combo ×2", "On fire ×3"),
+  mostrata accanto a "Quests". Solo motivazionale: non toglie mai nulla, svanisce con una pausa.
+- **Journey** (`/journey`): capitoli (The Awakening 1–7, Forging Habits 8–30, The Long Road 31–90, Seasons of Mastery
+  91–180, The Legend Grows 181–365, poi "Year N") con giorni attivi, giorni riusciti, streak migliore, workout, punteggio
+  medio; timeline di traguardi reali (livelli, streak 3/7/14/30…, primo workout e ogni 25, rientri dopo 3+ giorni di
+  pausa, achievement, stanze costruite, record). Dopo un reset del gioco compare "New run started".
+- **Percorsi di achievement** (stesso contatore con soglie crescenti, es. First Rep → Iron Veteran) e **vetrina** di 3
+  achievement sbloccati sul Character.
+- **Eventi del mondo**: la casa reagisce alla settimana reale (Lantern Festival con streak ≥ 7, palestra in fermento con 3
+  workout, giardino in fiore con 5 giorni idratati, biblioteca, casa splendente, animale felice, mercato del weekend,
+  "settimana tranquilla" solo dopo una settimana di storia), ognuno col suo "perché". **Collezioni** (tutte le stanze,
+  tutte al massimo, badge di maestria, guardaroba, acconciature, decorazioni) che si completano solo con cose costruite o
+  comprate con monete guadagnate: niente casualità, niente loot box.
+- Il reset del gioco azzera maestria, titolo e vetrina (la cronologia resta).
+
 ## 11. Allenamento
 
 - **Piano precaricato**: Lunedì Upper A · Mercoledì Lower + Core · Venerdì Upper B, 3 serie, recupero 60–120 s,
@@ -390,6 +410,16 @@ Il motore che sa **in che momento della giornata sei**, solo da tap espliciti (n
 - **Card di apertura** adattiva: mattina/pomeriggio/sera, "You've started late today" se si apre tardi, "Welcome back".
 
 ## 14. Coach e agente AI
+
+### 14.0 Comandi sul dispositivo e memoria
+Risposte immediate dai dati reali, senza richieste AI (anche con Gemini attivo): **"What should I do right now?" /
+"cosa faccio adesso?"**, **"How much time do I actually have today?"**, **"Plan my evening"** (dalle 18:00, lasciando 30
+minuti per rilassarsi), **"Prepare tomorrow"**, **"Show me what I have postponed"**, **"Help me recover from a bad day"**
+(le due cose più piccole, rassicurazione sullo streak, pulsante "Make today lighter").
+**Memoria del Coach**: "Remember that…" / "Ricorda che…", "Forget…", "What do you remember?". Note solo sul dispositivo
+(max 30 × 200 caratteri), visibili e modificabili in **Settings → Coach memory**, incluse nei backup, inviate a Gemini solo
+dentro una chat avviata dall'utente come dati (`playerNotes`), mai come istruzioni. Il Coach non salva nulla da solo. Le
+quest private sono mascherate in tutto ciò che va a Gemini.
 
 ### 14.1 Cos'è
 Una chat a schermo intero (`/coach`), raggiungibile anche dal pulsante **🎙️ Ask LifeForge** in alto nella Home.
@@ -540,7 +570,8 @@ difficoltà adattiva, streak, preset) e **smart rules** (regole SE → ALLORA, e
 
 Promemoria locali (workout, idratazione, quest, rinvii scaduti, recap giornaliero, level up, avviso streak, daily
 challenge, budget tempo di gioco), con un **governatore di frequenza** (massimo al giorno, distanza minima, fascia di
-silenzio) e silenziamento durante lavoro/allenamento/gioco. Orari appresi ("Learn my times") solo se l'utente lo attiva.
+silenzio) e silenziamento durante lavoro/allenamento/gioco **e durante il sonno** (dalle 04:00 alla sveglia e dall'ora di
+letto a fine giornata); le quest già completate non generano promemoria. Orari appresi ("Learn my times") solo se l'utente lo attiva.
 NoFap usa testi neutri ("Evening check-in"). Su iPhone le notifiche di sistema richiedono l'app installata sulla Home;
 **le push con app chiusa richiederebbero un backend push (non configurato)**: oggi i promemoria funzionano mentre l'app è
 aperta.
@@ -652,10 +683,10 @@ api/               4 funzioni Vercel sottili che chiamano server/ai
 
 ## 25. Qualità
 
-- `npm run check` = typecheck + lint + test + build di produzione. Stato attuale: **tutto verde, 275 test**.
+- `npm run check` = typecheck + lint + test + build di produzione. Stato attuale: **tutto verde** (numero di test aggiornato nel report finale).
 - Test di: logica di dominio (punteggio, streak, HP, energia, ricorrenze, capacità, progressione, target, daily context,
-  parser IT/EN inclusi negazioni e futuro), servizi su IndexedDB (loop di gioco, rollover dei giorni, **simulazione di 7
-  giorni** con verifica ledger/idempotenza, reset, backup, pasti, metriche, contesto), tool AI (validazione, anteprime,
+  parser IT/EN inclusi negazioni e futuro), servizi su IndexedDB (loop di gioco, rollover dei giorni, **simulazioni di 7, 30 e
+  60 giorni** (365 con `SIM_YEAR=1`) con invarianti di ledger/idempotenza/confine delle 04:00, reset, backup, pasti, metriche, contesto), tool AI (validazione, anteprime,
   apply, undo, idempotenza), orchestratore del Coach, handler serverless con client Gemini simulato (routing, fallback, 429,
   cost guard, schema fallback, errori), regressione del focus della tastiera, import ESM delle funzioni.
 - QA automatica con Playwright (`scripts/qa/audit.cjs`): visita ogni route e segnala overflow, elementi tagliati, target

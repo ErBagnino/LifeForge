@@ -32,7 +32,7 @@ export function memoryIntent(raw: string): MemoryIntent | undefined {
   if (/^(what do you remember|what have you remembered|show (me )?(your|the) memory|cosa ricordi|cosa ti ricordi( di me)?|mostrami la (tua )?memoria)\b/.test(t)) return { kind: 'recall' };
   const forget = /^(?:please |per favore )?(?:forget|dimentica)(?: that| che| la nota| the note(?: about)?| about)?\s+(.{2,80})$/i.exec(trimmed);
   if (forget) return { kind: 'forget', query: forget[1].replace(/[.!?]+$/, '').trim() };
-  const remember = /^(?:please |per favore )?(?:remember|ricorda(?:ti)?|tieni a mente|keep in mind)(?: that| che| di)?[:,]?\s+(.{3,})$/i.exec(trimmed);
+  const remember = /^(?:please |per favore )?(?:remember|ricorda(?:ti)?|tieni a mente|keep in mind)(?: that| che)?[:,]?\s+(.{3,})$/i.exec(trimmed);
   if (remember) {
     const text = remember[1].replace(/\s+/g, ' ').trim();
     // "Remind me to…" is a reminder, not a memory; "remember to" is a to-do phrasing.

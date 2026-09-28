@@ -43,12 +43,12 @@ export const RESET_INFO: Record<ResetKind, { title: string; deletes: string[]; k
   },
   game: {
     title: 'Reset game progress',
-    deletes: ['Level, XP and coins', 'HP, energy, streaks and inventory', 'Unlocked achievements and counters', 'Tycoon rooms and owned cosmetics'],
-    keeps: ['History: logs, meals, workouts, day results', 'Settings, activities, routines and plans'],
+    deletes: ['Level, XP and coins', 'HP, energy, streaks and inventory', 'Unlocked achievements and counters', 'Tycoon rooms and owned cosmetics', 'Mastery, equipped title and achievement showcase'],
+    keeps: ['History: logs, meals, workouts, day results', 'Settings, activities, routines and plans', 'Coach memory notes'],
   },
   all: {
     title: 'Reset EVERYTHING',
-    deletes: ['Game progress, level, XP, coins', 'All history: quests, logs, meals, workouts', 'Settings, activities, routines, plans, achievements', 'Coach chat, AI usage stats and change log'],
+    deletes: ['Game progress, level, XP, coins', 'All history: quests, logs, meals, workouts', 'Settings, activities, routines, plans, achievements', 'Coach chat, Coach memory, AI usage stats and change log'],
     keeps: ['Nothing. The app restarts from onboarding. Export a backup first if you might want it back.'],
   },
 };

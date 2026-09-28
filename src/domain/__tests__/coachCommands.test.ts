@@ -38,3 +38,11 @@ describe('memory intents', () => {
     expect(memoryIntent('I remember my first workout')).toBeUndefined();
   });
 });
+
+describe('memory vs reminders (Italian)', () => {
+  it('"ricordati di…" is a to-do, not a memory', () => {
+    expect(memoryIntent('ricordati di chiamare mamma')).toBeUndefined();
+    expect(memoryIntent('ricordami di comprare il latte')).toBeUndefined();
+    expect(memoryIntent('ricordati che odio correre')).toEqual({ kind: 'remember', text: 'Odio correre' });
+  });
+});
