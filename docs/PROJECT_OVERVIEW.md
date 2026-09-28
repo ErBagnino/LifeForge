@@ -683,7 +683,7 @@ api/               4 funzioni Vercel sottili che chiamano server/ai
 
 ## 25. Qualità
 
-- `npm run check` = typecheck + lint + test + build di produzione. Stato attuale: **tutto verde** (numero di test aggiornato nel report finale).
+- `npm run check` = typecheck + lint + test + build di produzione. Stato attuale: **tutto verde, 326 test**.
 - Test di: logica di dominio (punteggio, streak, HP, energia, ricorrenze, capacità, progressione, target, daily context,
   parser IT/EN inclusi negazioni e futuro), servizi su IndexedDB (loop di gioco, rollover dei giorni, **simulazioni di 7, 30 e
   60 giorni** (365 con `SIM_YEAR=1`) con invarianti di ledger/idempotenza/confine delle 04:00, reset, backup, pasti, metriche, contesto), tool AI (validazione, anteprime,
