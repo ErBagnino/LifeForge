@@ -171,4 +171,18 @@ describe('quiet reminders', () => {
     expect(applyQuietWindows(planned, [{ from: 0, to: 100 * 60_000, reason: 'work' }]).map((x) => x.tag)).toEqual(['quest200']);
     expect(applyQuietWindows(planned, [{ from: 0, to: 100 * 60_000, allow: ['leisure'], reason: 'play' }]).map((x) => x.tag)).toEqual(['leisure30', 'quest200']);
   });
+
+  it('stays silent while the player sleeps: before wake and after bedtime of the game day', async () => {
+    const { applyQuietWindows, sleepWindows } = await import('../reminders');
+    const { dateTimeToTs } = await import('@/utils/date');
+    const d = '2026-09-21';
+    const w = sleepWindows(d, '07:00', '23:00', 4);
+    const r = (hm: string) => ({ type: 'quest' as const, at: dateTimeToTs(d, hm, 4), title: '', body: '', tag: hm, priority: 50 });
+    const kept = applyQuietWindows([r('05:30'), r('07:00'), r('12:00'), r('22:59'), r('23:30'), r('02:00')], w).map((x) => x.tag);
+    expect(kept).toEqual(['07:00', '12:00', '22:59']);
+    // A bedtime after midnight still belongs to the same game day.
+    expect(applyQuietWindows([r('00:30'), r('01:30')], sleepWindows(d, '08:00', '01:00', 4)).map((x) => x.tag)).toEqual(['00:30']);
+    // Night shifts (bedtime before wake time in game order) fall back to quiet hours only.
+    expect(sleepWindows(d, '15:00', '07:00', 4)).toEqual([]);
+  });
 });

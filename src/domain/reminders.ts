@@ -1,4 +1,4 @@
-import type { NotificationRecord, NotificationSettings, NotificationType, Quest, TimeHM } from '@/types';
+import type { NotificationRecord, NotificationSettings, NotificationType, ISODate, Quest, TimeHM } from '@/types';
 import { dateTimeToTs, gameMinutes, hmToMinutes, minuteOfDay, minutesToHm } from '@/utils/date';
 
 export interface PlannedReminder {
@@ -125,13 +125,26 @@ export function governReminders(
   return accepted.sort((a, b) => a.at - b.at);
 }
 
-/** A period in which reminders must stay quiet (work, a workout, play time). */
+/** A period in which reminders must stay quiet (work, a workout, play time, sleep). */
 export interface QuietWindow {
   from: number;
   to: number;
   /** Reminder types still allowed (e.g. the play-time budget warnings). */
   allow?: NotificationType[];
-  reason: 'work' | 'training' | 'play';
+  reason: 'work' | 'training' | 'play' | 'sleep';
+}
+
+/** The game day's sleep: from its 04:00 start until wake, and from bedtime until the day ends. */
+export function sleepWindows(date: ISODate, wake: TimeHM, sleep: TimeHM, dayStartHour: number): QuietWindow[] {
+  const start = dateTimeToTs(date, `${String(dayStartHour).padStart(2, '0')}:00`, dayStartHour);
+  const end = start + 86_400_000;
+  const w = dateTimeToTs(date, wake, dayStartHour);
+  const s = dateTimeToTs(date, sleep, dayStartHour);
+  if (!(s > w)) return []; // unusual schedules (night shifts) keep only the player's quiet hours
+  return [
+    { from: start, to: w, reason: 'sleep' },
+    { from: s, to: end, reason: 'sleep' },
+  ];
 }
 
 /** Drop reminders that would fire inside a quiet window — context first, notifications second. */

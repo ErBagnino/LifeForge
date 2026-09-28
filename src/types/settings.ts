@@ -149,7 +149,6 @@ export interface NotificationSettings {
   hydrationIntervalMin: number;
   recapTime: TimeHM;
   learnTimes: boolean;
-  pushSubscribed: boolean;
 }
 
 export interface ScoreRules {

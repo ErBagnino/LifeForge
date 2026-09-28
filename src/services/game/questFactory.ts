@@ -30,6 +30,11 @@ export function resolveText(text: string, petName: string): string {
   return text.replace(/\{pet\}/g, petName).replace(/\{PET\}/g, petName.toUpperCase());
 }
 
+/** Pet-care quests wear the player's own pet emoji (Settings → Profile). */
+export function questIcon(icon: string, category: Quest['category'], settings: Settings): string {
+  return category === 'animal_care' && settings.profile.petEmoji?.trim() ? settings.profile.petEmoji.trim() : icon;
+}
+
 /** Quest target for metric-driven activities, read live from settings. */
 export function metricTarget(metric: MetricType, settings: Settings, fallback?: number): number | undefined {
   switch (metric) {
@@ -125,7 +130,7 @@ export function questFromActivity(a: Activity, ctx: FactoryContext, opts: Activi
     tier: opts.tier ?? a.tier,
     activityId: a.id,
     title,
-    icon: a.icon,
+    icon: questIcon(a.icon, a.category, ctx.settings),
     category: a.category,
     description,
     difficulty: a.difficulty,
@@ -188,7 +193,7 @@ export function goalQuest(
     kind,
     tier: 'optional',
     title: t.title,
-    icon: t.icon,
+    icon: questIcon(t.icon, t.category, ctx.settings),
     category: t.category,
     description: picked.description,
     difficulty: t.difficulty,

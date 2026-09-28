@@ -86,7 +86,6 @@ export function createDefaultSettings(): Settings {
       hydrationIntervalMin: 150,
       recapTime: '21:30',
       learnTimes: true,
-      pushSubscribed: false,
     },
     rules: structuredClone(DEFAULT_RULES),
     safety: { ...DEFAULT_SAFETY },

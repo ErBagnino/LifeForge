@@ -243,3 +243,16 @@ describe('meal windows and honest estimate ranges', () => {
   });
 });
 
+
+describe('pet emoji setting', () => {
+  it('pet-care quests wear the player pet emoji; other quests keep their icon', async () => {
+    const { questIcon } = await import('@/services/game/questFactory');
+    const { createDefaultSettings } = await import('@/data/defaultSettings');
+    const s = createDefaultSettings();
+    s.profile.petEmoji = '🐈';
+    expect(questIcon('🐾', 'animal_care', s)).toBe('🐈');
+    expect(questIcon('💧', 'hydration', s)).toBe('💧');
+    s.profile.petEmoji = '  ';
+    expect(questIcon('🐾', 'animal_care', s)).toBe('🐾');
+  });
+});

@@ -1,5 +1,5 @@
 import { learnTimes, reminderMinute } from '@/domain/habits';
-import { applyQuietWindows, governReminders, planReminders, type PlannedReminder, type QuietWindow } from '@/domain/reminders';
+import { applyQuietWindows, sleepWindows, governReminders, planReminders, type PlannedReminder, type QuietWindow } from '@/domain/reminders';
 import { expectedWork } from '@/domain/dailyContext';
 import { getOpenWork, learnedSchedule } from '../contextService';
 import { type LeisureTimer } from '@/domain/leisure';
@@ -84,8 +84,8 @@ export async function planToday(): Promise<PlannedReminder[]> {
     streak: player.streak.current,
   });
   planned.push(...(await leisureReminders(now)));
-  // Respect the daily context: no nudges at work, during a workout, or while playing.
-  const windows: QuietWindow[] = [];
+  // Respect the daily context: no nudges while asleep, at work, during a workout, or while playing.
+  const windows: QuietWindow[] = sleepWindows(today, plan.wake, plan.sleep, settings.dayStartHour);
   const work = await getOpenWork();
   if (work) {
     const learned = await learnedSchedule();

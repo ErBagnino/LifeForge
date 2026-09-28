@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { MAX_LEVEL } from '@/domain/level';
 import { classById, computeClassAffinities } from '@/domain/classes';
 import { useLevel } from '@/hooks';
 import { useGame } from '@/store/gameStore';
-import { formatInt } from '@/utils/format';
+import { formatCompact, formatInt } from '@/utils/format';
 import { Avatar } from '../game/Avatar';
 import { Flame } from '../game/bits';
 import { Icon } from '../ui/Icon';
@@ -15,7 +16,7 @@ import { openAsk } from './AskSheet';
 
 function Meter({ icon, value, max, color, label, id, tip }: { icon: string; value: number; max: number; color: string; label: string; id?: string; tip?: InfoKey }) {
   return (
-    <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2.5 py-1.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
+    <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2 py-1.5 min-[360px]:px-2.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
       <span aria-hidden className="text-[14px]">
         {icon}
       </span>
@@ -25,7 +26,8 @@ function Meter({ icon, value, max, color, label, id, tip }: { icon: string; valu
         </div>
         <ProgressBar value={value / max} color={color} height={4} className="mt-1" />
       </div>
-      {tip && <InfoTip k={tip} />}
+      {/* The ⓘ gives way to the number on very narrow phones (the tips stay reachable from the tour). */}
+      {tip && <InfoTip k={tip} className="max-[359px]:hidden" />}
     </div>
   );
 }
@@ -48,15 +50,18 @@ export function GameHud() {
         </button>
         <div className="min-w-0 flex-1" id="hud-xp">
           <div className="flex items-baseline gap-2">
-            <span className="num text-[13px] font-extrabold tracking-wider text-muted">LEVEL</span>
-            <AnimatedNumber value={level} className="text-[22px] leading-none font-extrabold" />
-            <span className="truncate text-[12px] font-semibold text-muted">
+            <span className="num shrink-0 text-[13px] font-extrabold tracking-wider text-muted">
+              <span className="max-[359px]:hidden">LEVEL</span>
+              <span className="min-[360px]:hidden" aria-label="Level">LV</span>
+            </span>
+            <AnimatedNumber value={level} className="shrink-0 text-[22px] leading-none font-extrabold" />
+            <span className="min-w-0 truncate text-[12px] font-semibold text-muted">
               {cls.icon} {cls.name}
             </span>
           </div>
           <ProgressBar value={progress} color="linear-gradient(90deg, var(--lf-xp), #b18cff)" height={8} className="mt-1.5" label="XP to next level" />
           <div className="num mt-0.5 text-[11px] font-semibold text-muted">
-            {formatInt(into)} / {formatInt(needed)} XP · {Math.round(progress * 100)}%
+            {level >= MAX_LEVEL ? 'Max level reached' : `${formatInt(into)} / ${formatInt(needed)} XP · ${Math.round(progress * 100)}%`}
           </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
@@ -71,13 +76,13 @@ export function GameHud() {
       <div className="mt-3 flex gap-2">
         <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" tip="hp" />
         <Meter icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" tip="energy" />
-        <div className="flex items-center gap-1 rounded-2xl bg-surface-2 px-2.5" aria-label={`Streak ${player.streak.current} days`}>
+        <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`Streak ${player.streak.current} days`}>
           <Flame size={16} dim={player.streak.current === 0} />
           <span className="num text-[15px] font-bold">{player.streak.current}</span>
         </div>
-        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex items-center gap-1 rounded-2xl bg-surface-2 px-2.5" aria-label={`${player.coins} coins, open shop`}>
+        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`${formatInt(player.coins)} coins, open shop`}>
           <span aria-hidden>🪙</span>
-          <AnimatedNumber value={player.coins} className="text-[15px] font-bold text-coin" />
+          <AnimatedNumber value={player.coins} format={formatCompact} className="text-[15px] font-bold text-coin" />
         </button>
       </div>
 

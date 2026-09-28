@@ -24,6 +24,7 @@ const DAYS = [
 
 export default function PlanEditor() {
   const refresh = useGame((s) => s.refresh);
+  const minRest = useGame((s) => s.settings?.safety.minRestDaysPerWeek ?? 1);
   const { data } = useAsync(async () => ({ plan: await workoutRepository.activePlan(), exercises: await workoutRepository.exercises.all() }), [], { live: false });
   const [plan, setPlan] = useState<WorkoutPlan | undefined>();
   const [picker, setPicker] = useState<number | null>(null);
@@ -32,6 +33,8 @@ export default function PlanEditor() {
     if (data?.plan) setPlan(structuredClone(data.plan));
   }, [data?.plan]);
   if (!data || !plan) return null;
+  const trainingDays = new Set(plan.templates.map((t) => t.weekday).filter((d): d is number => d !== null && d !== undefined)).size;
+  const restDays = 7 - trainingDays;
   const exName = (id: string) => data.exercises.find((e) => e.id === id)?.name ?? id;
 
   const setTemplate = (i: number, t: WorkoutTemplate) => {
@@ -122,6 +125,11 @@ export default function PlanEditor() {
       >
         Add training day
       </Button>
+      {restDays < minRest && (
+        <p role="note" className="mt-3 rounded-2xl bg-warning/12 px-4 py-3 text-[13px] text-fg">
+          This plan leaves {restDays} rest {restDays === 1 ? 'day' : 'days'} a week; your safety setting asks for at least {minRest}. Muscles grow while you recover — you can still save it.
+        </p>
+      )}
       <Button
         block
         size="lg"
