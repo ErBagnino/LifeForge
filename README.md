@@ -374,6 +374,7 @@ docs/            architecture, game design, database, progression, future iOS
 
 ## Documentation
 
+- [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md): complete self-contained description of the whole project (Italian) — product, game systems, AI, screens, data, architecture, limits.
 - [`docs/architecture.md`](docs/architecture.md): layers, data flow, transactions, service worker, testing.
 - [`docs/game-design.md`](docs/game-design.md): core loop, quest types, score, HP/energy, streaks, world, safety rules.
 - [`docs/database.md`](docs/database.md): IndexedDB schema, indexes, migrations, export format.
