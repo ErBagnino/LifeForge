@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { MemoryPanel } from './MemoryPanel';
 import { useNavigate, useParams } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Field, List, NumberInput, Row, Segmented, Select, TextInput, TimeInput, Toggle } from '@/components/ui/forms';
@@ -51,6 +52,7 @@ const TITLES: Record<string, string> = {
   coach: 'AI',
   ai: 'AI',
   routine: 'Daily Routine',
+  memory: 'Coach memory',
 };
 
 export default function SettingsSection() {
@@ -69,6 +71,7 @@ export default function SettingsSection() {
     coach: <AiPanel />,
     ai: <AiPanel />,
     routine: <RoutinePanel />,
+    memory: <MemoryPanel />,
   };
   return (
     <Screen back="/settings" title={TITLES[section] ?? 'Settings'}>

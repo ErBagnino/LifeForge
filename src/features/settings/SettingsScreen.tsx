@@ -40,6 +40,7 @@ export default function SettingsScreen() {
       </List>
       <List title="System">
         <Row icon="🔔" iconBg="#ffe3d3" title="Notifications" subtitle={settings.notifications.enabled ? 'On' : 'Off'} onClick={go('notifications')} />
+        <Row icon="📝" iconBg="#fff1cc" title="Coach memory" subtitle="What the Coach remembers — view, edit, delete" onClick={go('memory')} />
         <Row icon="✨" iconBg="#ececf0" title="AI" subtitle={settings.coach.ai.enabled ? `Gemini · ${aiLabel} · usage` : 'Off · basic coach'} onClick={go('ai')} />
         <Row icon="💾" iconBg="#e3f4ff" title="Data" subtitle="Export / import JSON backup" onClick={go('data')} />
         <Row icon="🧭" iconBg="#d6f5e6" title="Help" subtitle="Replay the interactive tour" onClick={() => startTutorial()} />

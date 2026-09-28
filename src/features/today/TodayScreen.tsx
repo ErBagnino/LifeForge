@@ -8,6 +8,7 @@ import { Button, Card, Chip, EmptyState } from '@/components/ui/primitives';
 import { rampLimits } from '@/domain/capacity';
 import { DIFFICULTY_STATE_INFO } from '@/domain/adaptive';
 import { coachLine } from '@/domain/coach';
+import { computeMomentum, momentumLabel } from '@/domain/momentum';
 import { tierCount } from '@/domain/score';
 import { useAsync, useNow } from '@/hooks';
 import { questRepository, routineRepository } from '@/repositories';
@@ -117,6 +118,9 @@ export default function TodayScreen() {
           ? { icon: '🌤️', text: 'Free day' }
           : { icon: '💼', text: workStatus === 'partial' ? 'Workday · partial' : 'Workday' };
   const sideOpen = groups.side.length <= 3;
+  // Momentum is a feel-good signal only: it appears while you're on a roll and quietly fades.
+  const momentum = computeMomentum(today.quests.filter((q) => q.status === 'completed' && q.completedAt).map((q) => q.completedAt!), now);
+  const momentumText = momentumLabel(momentum);
 
   return (
     <Screen hud>
@@ -205,7 +209,14 @@ export default function TodayScreen() {
       <SuggestionCards />
 
       <div className="mt-5 flex items-center justify-between gap-2">
-        <h2 className="text-[20px] font-bold">Quests</h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="text-[20px] font-bold">Quests</h2>
+          {momentumText && (
+            <span className="truncate rounded-full bg-accent/12 px-2.5 py-1 text-[12px] font-bold text-accent" title={`Finish another quest within ${momentum.minutesLeft} min to keep it going`} aria-label={`${momentumText}. ${momentum.minutesLeft} minutes to keep the combo going.`}>
+              🔥 {momentumText}
+            </span>
+          )}
+        </div>
         <Segmented
           size="sm"
           className="w-[184px] shrink-0"

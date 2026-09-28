@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InsightRow } from '../stats/InsightRow';
 import { Screen } from '@/components/layout/Screen';
 import { Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/progress';
@@ -104,10 +105,7 @@ export default function WeeklyReview() {
       <SectionTitle>Coach insights</SectionTitle>
       <Card className="space-y-3">
         {data.insights.slice(0, 5).map((i) => (
-          <div key={i.id} className="flex gap-3 text-[14px]">
-            <span>{i.icon}</span>
-            <span>{i.text}</span>
-          </div>
+          <InsightRow key={i.id} insight={i} />
         ))}
         {!data.insights.length && <div className="text-[13px] text-muted">Play a few more days for insights.</div>}
       </Card>

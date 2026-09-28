@@ -99,6 +99,8 @@ export function GameHud() {
         <List>
           <Row icon="🧙" title="Character" subtitle="Class, stats, inventory" onClick={() => { setMenu(false); navigate('/profile'); }} />
           <Row icon="🏅" title="Achievements" onClick={() => { setMenu(false); navigate('/achievements'); }} />
+          <Row icon="🌿" title="Mastery" subtitle="Ten life tracks and perk titles" onClick={() => { setMenu(false); navigate('/mastery'); }} />
+          <Row icon="🧭" title="Journey" subtitle="Chapters and milestones" onClick={() => { setMenu(false); navigate('/journey'); }} />
           <Row icon="🎨" title="Customize avatar" onClick={() => { setMenu(false); navigate('/world/avatar'); }} />
           <Row icon="🎮" title="Play time" subtitle="Daily budget timer" onClick={() => { setMenu(false); navigate('/play'); }} />
           <Row icon="💬" title="Coach chat" subtitle="Gemini AI or basic coach" onClick={() => { setMenu(false); navigate('/coach'); }} />

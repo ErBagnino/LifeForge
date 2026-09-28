@@ -1,4 +1,5 @@
 import { WorkStatsCard } from './WorkStatsCard';
+import { InsightRow } from './InsightRow';
 import { useNavigate } from 'react-router';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { Screen } from '@/components/layout/Screen';
@@ -41,12 +42,7 @@ export default function StatsScreen() {
           <SectionTitle>Coach</SectionTitle>
           <Card className="space-y-3">
             {insights.slice(0, 4).map((i) => (
-              <div key={i.id} className="flex gap-3">
-                <span className="text-[20px]" aria-hidden>
-                  {i.icon}
-                </span>
-                <p className="text-[14px] leading-snug">{i.text}</p>
-              </div>
+              <InsightRow key={i.id} insight={i} />
             ))}
           </Card>
         </>
@@ -59,6 +55,8 @@ export default function StatsScreen() {
       <WorkStatsCard />
 
       <List title="Dig deeper">
+        <Row icon="🧭" title="Journey" subtitle="Chapters and real milestones" onClick={() => navigate('/journey')} />
+        <Row icon="🌿" title="Mastery" subtitle="Ten life tracks" onClick={() => navigate('/mastery')} />
         <Row icon="📅" title="Calendar" subtitle="Every day, with history" onClick={() => navigate('/stats/calendar')} />
         <Row icon="📈" title="Advanced stats" subtitle="Weight, steps, nutrition, workouts, categories" onClick={() => navigate('/stats/advanced')} />
         <Row icon="🏆" title="Personal records" onClick={() => navigate('/stats/records')} />

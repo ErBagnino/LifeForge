@@ -47,3 +47,11 @@ export function findNewlyUnlocked(achievements: Achievement[], counters: Counter
 export function conditionKeys(cond: Condition): string[] {
   return cond.type === 'counter' ? [cond.key] : cond.of.flatMap(conditionKeys);
 }
+
+
+/** Achievements that count the same thing at rising targets form a path (First Rep → Iron Veteran). */
+export function achievementPaths(list: Achievement[]): Achievement[][] {
+  const byKey = new Map<string, Achievement[]>();
+  for (const a of list) if (a.condition.type === 'counter' && !a.hidden) byKey.set(a.condition.key, [...(byKey.get(a.condition.key) ?? []), a]);
+  return [...byKey.values()].filter((g) => g.length >= 2).map((g) => g.sort((x, y) => (x.condition.type === 'counter' && y.condition.type === 'counter' ? x.condition.gte - y.condition.gte : 0)));
+}

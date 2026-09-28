@@ -9,6 +9,8 @@ export interface Insight {
   kind: InsightKind;
   text: string;
   priority: number;
+  /** Where the insight comes from: the data and window it was computed on (shown on tap). */
+  source?: string;
 }
 
 export interface CoachData {
@@ -246,7 +248,27 @@ export function generateInsights(d: CoachData): Insight[] {
       }),
     });
   }
-  return out.sort((a, b) => b.priority - a.priority);
+  return out.map((i) => ({ ...i, source: insightSource(i.id, d) })).sort((a, b) => b.priority - a.priority);
+}
+
+const pctOf = (r: number | null) => (r === null ? 'no data' : `${Math.round(r * 100)}%`);
+
+/** A plain explanation of the numbers behind each insight, so none is a black box. */
+export function insightSource(id: string, d: CoachData): string {
+  if (id === 'core_high' || id === 'core_low') return `Core quests completed in the last 7 days: ${pctOf(d.week.coreRate)} over ${d.week.days} logged days.`;
+  if (id === 'score_trend') return `Average Today Score: ${Math.round(d.week.avgScore ?? 0)} this week vs ${Math.round(d.week.prevAvgScore ?? 0)} the week before.`;
+  if (id === 'best_day') return 'Completion rate of your quests by weekday over the last 28 days (weekdays with at least 5 quests).';
+  if (id.startsWith('hydration')) return `Closed days at your water target: ${pctOf(d.hydration.thisWeek)} this week vs ${pctOf(d.hydration.lastWeek)} last week.`;
+  if (id === 'steps_trend') return `Average of logged steps: ${Math.round(d.steps.thisWeekAvg ?? 0).toLocaleString('en-US')}/day this week vs ${Math.round(d.steps.lastWeekAvg ?? 0).toLocaleString('en-US')}/day last week.`;
+  if (id.startsWith('improve_')) return 'Your last 6 sessions of this exercise: weight or reps went up in consecutive sessions.';
+  if (id.startsWith('shift_')) return 'Median completion time of this activity on weekdays vs weekends (last 28 days, at least 4 completions).';
+  if (id.startsWith('tomorrow')) return `Tomorrow’s forecast from your schedule and due activities: load ${d.tomorrow?.workload ?? '—'} (${d.tomorrow?.level ?? '—'}).`;
+  if (id === 'weight_trend') return `Linear trend of your weight entries in the last 28 days: ${d.weight ? d.weight.trendPerWeek.toFixed(2) : '—'} kg/week.`;
+  if (id === 'snooze_heavy') return `Times this quest was snoozed or moved in the last 10 days: ${d.snoozeHeavy?.count ?? 0}.`;
+  if (id === 'categories') return 'Completion rate by category over the last 14 days (categories with enough quests to compare).';
+  if (id === 'recovery') return `Recovery Mode turns on when HP gets low; current HP ${d.hp}.`;
+  if (id === 'streak') return `Consecutive successful days: ${d.streak}.`;
+  return 'Computed on this device from your own logged data.';
 }
 
 /** One contextual line for the Today header area. */

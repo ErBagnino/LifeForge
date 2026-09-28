@@ -8,7 +8,9 @@ import { Button, Card, Kpi, SectionTitle } from '@/components/ui/primitives';
 import { STAT_INFO } from '@/data/categories';
 import { classById, computeClassAffinities, statLevel } from '@/domain/classes';
 import { useAsync, useLevel } from '@/hooks';
-import { questRepository, statsRepository } from '@/repositories';
+import { achievementRepository, questRepository, statsRepository } from '@/repositories';
+import { getEquippedTitle, getShowcase } from '@/services/progressService';
+import { resolveText } from '@/services/game/questFactory';
 import { clock } from '@/services/clock';
 import { useGame } from '@/store/gameStore';
 import type { ActivityCategory, StatKey, StatMap } from '@/types';
@@ -34,6 +36,10 @@ export default function ProfileScreen() {
     const core = logs.reduce((a, l) => ({ d: a.d + l.core.done, t: a.t + l.core.total }), { d: 0, t: 0 });
     return { stats, cats, coreRate: core.t ? core.d / core.t : 0, recoveryDays: logs.filter((l) => l.difficultyState === 'critical').length, counters };
   }, [today]);
+  const { data: extra } = useAsync(async () => {
+    const [title, ids, all] = await Promise.all([getEquippedTitle(), getShowcase(), achievementRepository.all()]);
+    return { title, showcase: ids.map((id) => all.find((a) => a.id === id)).filter((a) => !!a?.unlockedAt) };
+  }, []);
   if (!player || !settings) return null;
   const affinities = data ? computeClassAffinities({ stats: data.stats, categoryCounts: data.cats, coreRate: data.coreRate, streak: player.streak.current, recoveryDays: data.recoveryDays + (data.counters['recovery.exits'] ?? 0) * 3, worldSpend: player.lifetime.coinsSpent }) : [];
   const top = affinities[0] ? classById(affinities[0].classId) : classById('balanced');
@@ -45,6 +51,7 @@ export default function ProfileScreen() {
         <Avatar config={player.avatar} size={84} ring="var(--lf-accent)" />
         <div className="min-w-0 flex-1">
           <div className="text-[22px] font-extrabold">{settings.profile.nickname || player.name}</div>
+          {extra?.title && <div className="text-[13px] font-bold text-accent">« {extra.title.title} »</div>}
           <div className="text-[14px] text-muted">Level {level} · {formatInt(player.lifetime.xpEarned)} XP lifetime</div>
           <ProgressBar value={progress} color="var(--lf-xp)" className="mt-2" />
         </div>
@@ -52,6 +59,22 @@ export default function ProfileScreen() {
       <Button block variant="secondary" className="mt-2" icon="edit" onClick={() => navigate('/world/avatar')}>
         Customize avatar
       </Button>
+
+      <SectionTitle action={<button type="button" className="hit-44 text-[13px] font-semibold text-accent" onClick={() => navigate('/achievements')}>{extra?.showcase.length ? 'Edit' : 'Pick'}</button>}>Showcase</SectionTitle>
+      {extra?.showcase.length ? (
+        <div className="grid grid-cols-3 gap-2">
+          {extra.showcase.map((a) => (
+            <Card key={a!.id} className="!p-3 text-center">
+              <div className="text-[30px]" aria-hidden>
+                {a!.icon}
+              </div>
+              <div className="mt-1 text-[12px] leading-tight font-bold [overflow-wrap:anywhere]">{resolveText(a!.name, settings.profile.petName)}</div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <p className="px-1 text-[13px] text-muted">Pin up to three unlocked achievements to show them off here.</p>
+      )}
 
       <SectionTitle>Current class</SectionTitle>
       <Card>
@@ -134,6 +157,8 @@ export default function ProfileScreen() {
       )}
       <List>
         <Row icon="🏅" title="Achievements" onClick={() => navigate('/achievements')} />
+        <Row icon="🌿" title="Mastery" onClick={() => navigate('/mastery')} />
+        <Row icon="🧭" title="Journey" onClick={() => navigate('/journey')} />
         <Row icon="🏆" title="Personal records" onClick={() => navigate('/stats/records')} />
         <Row icon="⚙️" title="Settings" onClick={() => navigate('/settings')} />
       </List>

@@ -155,7 +155,10 @@ function datesOf(scope: Extract<Scope, { kind: 'dates' }>, days?: number[]): ISO
 
 const HOURS_EXAMPLES = 'For example “9–18”, “from 8:30” or “until 14”.';
 const HELP_QUICK: QuickReply[] = [
+  { label: 'What should I do now?', value: 'text:What should I do right now?' },
   { label: 'Plan my day', value: 'text:Plan my day' },
+  { label: 'Plan my evening', value: 'text:Plan my evening' },
+  { label: 'Prepare tomorrow', value: 'text:Prepare tomorrow' },
   { label: 'I don’t know my hours yet', value: 'text:I don’t know my work schedule yet' },
   { label: 'No gym this week', value: 'text:No gym this week' },
   { label: 'What do you know about me?', value: 'text:What do you know about me?' },
@@ -354,7 +357,7 @@ function handleIntent(i: Intent, ctx: AssistantContext): CoachReply | undefined 
       return { text: 'Here’s what I know so far:', action: 'status' };
     case 'help':
       return {
-        text: 'I help you configure LifeForge by chat. Tell me things like “from Monday I work 8–18”, “tomorrow I work 10–20”, “Wednesday I finish earlier”, “no gym this week”, “from October I’ll have more time” or “I want to focus on strength”. I always show a preview first.',
+        text: 'I help you run your day and configure LifeForge by chat. Ask “what should I do right now?”, “how much time do I actually have today?”, “plan my evening”, “prepare tomorrow”, “show me what I postponed” or “help me recover from a bad day”. Tell me changes like “from Monday I work 8–18” or “no gym this week” — I always show a preview first. Say “remember that…” and I’ll keep a note you can edit in Settings → Coach memory.',
         quick: HELP_QUICK,
       };
     case 'greeting':

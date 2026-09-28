@@ -10,6 +10,8 @@ import { tycoonRepository } from '@/repositories';
 import { useGame } from '@/store/gameStore';
 import type { ActivityCategory, Building } from '@/types';
 import { formatInt } from '@/utils/format';
+import { loadWorldExtras } from '@/services/progressService';
+import { ProgressBar } from '@/components/ui/progress';
 import { BuildingSheet } from './BuildingSheet';
 import { RoomScene } from './RoomScene';
 
@@ -51,6 +53,8 @@ export default function WorldScreen() {
   const hour = new Date(now).getHours();
   const [selected, setSelected] = useState<Building | null>(null);
   const { data: cosmetics } = useAsync(() => tycoonRepository.cosmetics.all(), []);
+  const { data: extras } = useAsync(() => loadWorldExtras(), []);
+  const [openSet, setOpenSet] = useState<string | null>(null);
 
   useEffect(() => {
     const room = params.get('room');
@@ -71,6 +75,8 @@ export default function WorldScreen() {
   const cheapDeco = deco.find((c) => c.type === 'decoration' && !c.owned && c.price <= player.coins && buildings.find((b) => b.id === c.room)?.level);
   const sky = hour >= 6 && hour < 17 ? 'linear-gradient(#7cc8ff, #cdeeff)' : hour >= 17 && hour < 20 ? 'linear-gradient(#ff8a5b, #ffd29a)' : 'linear-gradient(#0f1330, #28295e)';
   const bestRoom = buildings.filter((b) => b.level > 0).sort((a, b) => b.level - a.level)[0];
+  const eventRooms = new Set((extras?.events ?? []).map((e) => e.room).filter(Boolean));
+  const festival = extras?.events.some((e) => e.id === 'lantern_festival');
 
   return (
     <Screen hud>
@@ -102,7 +108,36 @@ export default function WorldScreen() {
         </Card>
       )}
 
+      {!!extras?.events.length && (
+        <div className="mt-3 space-y-2" aria-label="World events">
+          {extras.events.map((e) => (
+            <Card key={e.id} className="!p-3">
+              <div className="flex items-start gap-3">
+                <span className="text-[26px]" aria-hidden>
+                  {e.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-extrabold tracking-widest text-accent uppercase">World event</div>
+                  <div className="text-[15px] font-bold">{e.title}</div>
+                  <div className="text-[13px] text-muted">{e.text}</div>
+                  <div className="mt-0.5 text-[11px] text-faint">Because: {e.because}</div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
       <div className="relative mt-4 overflow-hidden rounded-[28px] shadow-card" style={{ background: sky }}>
+        {festival && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-around text-[16px]" aria-hidden>
+            {['🏮', '🏮', '🏮', '🏮'].map((l, i) => (
+              <motion.span key={i} animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 2.4, delay: i * 0.3 }}>
+                {l}
+              </motion.span>
+            ))}
+          </div>
+        )}
         {hour >= 20 || hour < 6 ? (
           <div className="pointer-events-none absolute inset-0 text-[10px] text-white/70">
             {['12% 8%', '30% 20%', '70% 6%', '85% 25%', '50% 12%'].map((p) => (
@@ -126,7 +161,7 @@ export default function WorldScreen() {
                 {rooms
                   .sort((a, b) => (a.slot === 'left' ? -1 : b.slot === 'left' ? 1 : 0))
                   .map((b) => (
-                    <div key={b.id} className={cx('h-[112px] overflow-hidden rounded-md bg-surface-2', b.slot === 'full' && 'col-span-2')}>
+                    <div key={b.id} className={cx('h-[112px] overflow-hidden rounded-md bg-surface-2', b.slot === 'full' && 'col-span-2', b.level > 0 && eventRooms.has(b.id) && 'ring-2 ring-accent ring-offset-1 ring-offset-[#8a7766]')}>
                       {b.level > 0 ? (
                         <button type="button" className="relative block h-full w-full text-left" onClick={() => setSelected(b)} aria-label={`${b.name} level ${b.level}`}>
                           <RoomScene building={b} decorations={deco} height={112} showAvatar={b.id === bestRoom?.id} avatar={player.avatar} hour={hour} />
@@ -184,6 +219,42 @@ export default function WorldScreen() {
             ))}
           </div>
         </Card>
+      )}
+
+      {!!extras?.collections.length && (
+        <>
+          <SectionTitle>Collections</SectionTitle>
+          <div className="space-y-2">
+            {extras.collections.map((c) => (
+              <Card key={c.id} className="!p-3" onClick={() => setOpenSet(openSet === c.id ? null : c.id)}>
+                <div className="flex items-center gap-3">
+                  <span className="text-[24px]" aria-hidden>
+                    {c.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[15px] font-semibold">{c.title}</span>
+                      <span className={cx('num shrink-0 text-[12px] font-bold', c.complete ? 'text-success' : 'text-muted')}>{c.complete ? 'Complete ✓' : `${c.owned}/${c.total}`}</span>
+                    </div>
+                    <ProgressBar value={c.total ? c.owned / c.total : 0} height={4} className="mt-1" />
+                  </div>
+                </div>
+                {openSet === c.id && (
+                  <>
+                    <p className="mt-2 text-[12px] text-muted">{c.description}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {c.items.map((i) => (
+                        <span key={i.id} className={cx('rounded-full px-2.5 py-1 text-[12px] font-semibold', i.owned ? 'bg-accent/12 text-fg' : 'bg-surface-2 text-muted opacity-70')}>
+                          <span className={cx(!i.owned && 'grayscale')}>{i.icon}</span> {i.label}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       <SectionTitle>All rooms</SectionTitle>

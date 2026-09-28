@@ -30,8 +30,8 @@ export function dailyContextSummary(snap: ContextSnapshot) {
     minutesToBed: view.minutesToBed,
     stillMattersMinutes: view.plannedMin,
     fits: view.fits,
-    focus: view.focus.map((d) => ({ id: d.quest.id, title: d.quest.title, priority: d.priority, minutes: d.quest.durationMin, why: d.reason })),
-    notRealisticToday: view.decisions.filter((d) => !d.realistic && d.priority !== 'OPTIONAL').map((d) => d.quest.title).slice(0, 5),
+    focus: view.focus.map((d) => ({ id: d.quest.id, title: d.quest.private ? 'Private quest' : d.quest.title, priority: d.priority, minutes: d.quest.durationMin, why: d.reason })),
+    notRealisticToday: view.decisions.filter((d) => !d.realistic && d.priority !== 'OPTIONAL').map((d) => (d.quest.private ? 'Private quest' : d.quest.title)).slice(0, 5),
     typical: {
       wakeUp: learned.wake.all ? hm(learned.wake.all.median) : 'unknown',
       workdays: learned.work.workdays,

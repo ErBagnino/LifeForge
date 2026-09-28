@@ -133,6 +133,10 @@ export async function runReset(kind: ResetKind): Promise<ServiceResult> {
         await db.quests.bulkDelete(quests.filter((q) => q.date >= today || q.kind === 'weekly' || q.kind === 'boss').map((q) => q.id));
         await db.dayLogs.delete(today);
         await metaRepository.remove('currentDate');
+        // Mastery, perks and the showcase belong to game progress: start them over too (history stays).
+        await metaRepository.set('progressSince', today);
+        await metaRepository.remove('equippedTitle');
+        await metaRepository.remove('achievementShowcase');
       });
       break;
     case 'all':

@@ -127,3 +127,28 @@ describe('coach assistant', () => {
     expect(edited.lines[0]).toBe('Mon–Thu 09:00–18:00');
   });
 });
+
+describe('traceable insights', () => {
+  it('every generated insight explains its data source', async () => {
+    const { generateInsights, insightSource } = await import('../coach');
+    const d = {
+      seed: '2026-03-01', tone: 'serious', hour: 10,
+      week: { coreRate: 0.95, avgScore: 80, prevAvgScore: 60, days: 6 },
+      bestWeekday: { weekday: 2, rate: 0.9 },
+      hydration: { thisWeek: 0.8, lastWeek: 0.3 },
+      steps: { thisWeekAvg: 9000, lastWeekAvg: 6000 },
+      weight: { trendPerWeek: -0.4, goal: 'lose' },
+      improvements: [{ name: 'Squat', sessions: 3 }],
+      timeShifts: [], tomorrow: { workload: 80, level: 'high' }, streak: 9, hp: 80, energy: 70, recoveryMode: false,
+      snoozeHeavy: { name: 'Read', count: 4 }, strongestCategory: 'fitness', weakestCategory: 'reading', pendingCore: 1, totalCore: 3,
+    } as unknown as Parameters<typeof generateInsights>[0];
+    const list = generateInsights(d);
+    expect(list.length).toBeGreaterThan(5);
+    for (const i of list) {
+      expect(i.source).toBeTruthy();
+      expect(i.source).not.toBe('Computed on this device from your own logged data.');
+    }
+    expect(insightSource('core_high', d)).toContain('95%');
+    expect(insightSource('snooze_heavy', d)).toContain('4');
+  });
+});

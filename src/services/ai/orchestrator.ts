@@ -1,4 +1,5 @@
 import { classifyCoachText } from '@/ai/shared/classify';
+import { coachCommand, memoryIntent } from '@/domain/coachCommands';
 import { isLocalCommand } from '@/domain/ruleIntents';
 import { questRepository, settingsRepository } from '@/repositories';
 import type { CoachPersonality } from '@/types';
@@ -110,6 +111,7 @@ export async function sendMessage(state: ChatState, input: TurnInput, opts: { fo
 }
 
 async function localCommand(text: string): Promise<boolean> {
+  if (coachCommand(text) || memoryIntent(text)) return true;
   const today = clock.today();
   const pending = (await questRepository.byDate(today)).filter((q) => q.status === 'pending').map((q) => ({ id: q.id, title: q.title }));
   return isLocalCommand(text, today, pending);

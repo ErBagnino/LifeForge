@@ -1,4 +1,6 @@
 import { type AssistantContext, type ConfigChange, type Pending, type Proposal, type QuickReply, respond, withWorkDays } from '@/domain/coachAssistant';
+import { coachCommand, memoryIntent } from '@/domain/coachCommands';
+import { answerCommand, answerMemory } from './coachCommandService';
 import { completionIntent, ruleIntent, type RuleToolCall } from '@/domain/ruleIntents';
 import { profileFields } from '@/domain/profile';
 import { describeWork, resolveEntry, summarizeSchedule, workFromPlan } from '@/domain/schedule';
@@ -268,6 +270,17 @@ export async function sendMessage(state: ChatState, input: { text: string; value
   const ctx: AssistantContext = { today, settings, todayWork: workFromPlan(plan), lightened, hasPendingProposal: !!pendingProposal, newId: () => uid('p_') };
 
   let messages: ChatMessage[] = [...state.messages, { id: uid('m_'), role: 'user', text: input.text, ts: Date.now() }];
+
+  // On-device commands ("What should I do right now?", "Remember that…") answered from real data.
+  const said = input.value ? (input.value.startsWith('text:') ? input.value.slice(5) : undefined) : input.text;
+  const mem = said === undefined ? undefined : memoryIntent(said);
+  const cmd = said === undefined || mem ? undefined : coachCommand(said);
+  if (mem || cmd) {
+    const a = mem ? await answerMemory(mem) : await answerCommand(cmd!);
+    messages.push({ id: uid('m_'), role: 'coach', text: a.text, info: a.info, quick: a.quick, ts: Date.now(), local: true });
+    return { state: await save({ messages, pending: undefined }) };
+  }
+
   const reply = respond(input, ctx, state.pending);
   const coach: ChatMessage = { id: uid('m_'), role: 'coach', text: reply.text, ts: Date.now(), quick: reply.quick };
   let result: ServiceResult | undefined;

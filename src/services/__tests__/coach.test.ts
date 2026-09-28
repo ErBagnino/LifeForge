@@ -64,3 +64,54 @@ describe('coach service (IndexedDB)', () => {
   });
 
 });
+
+describe('on-device coach commands and memory', () => {
+  beforeEach(fresh);
+
+  it('answers "what should I do right now?" and "plan my evening" from the real board, without AI', async () => {
+    const { ensureToday } = await import('../game/dayService');
+    await ensureToday();
+    let { state } = await sendMessage(await loadChat(), { text: 'What should I do right now?' });
+    let msg = lastCoach(state);
+    expect(msg.local).toBe(true);
+    expect(msg.text).toMatch(/^Do this now: |Nothing is pending|wind-down/);
+    ({ state } = await sendMessage(state, { text: 'How much time do I actually have today?' }));
+    msg = lastCoach(state);
+    expect(msg.info?.map((i) => i.label)).toContain('Realistically free');
+    ({ state } = await sendMessage(state, { text: 'Show me what I have postponed' }));
+    expect(lastCoach(state).text).toMatch(/Nothing postponed|postponed/);
+    ({ state } = await sendMessage(state, { text: 'Help me recover from a bad day' }));
+    expect(lastCoach(state).text).toMatch(/Bad days happen/);
+    expect(lastCoach(state).quick?.[0].label).toBe('Make today lighter');
+    ({ state } = await sendMessage(state, { text: 'Prepare tomorrow' }));
+    expect(lastCoach(state).info?.[0].label).toMatch(/Thursday/);
+  });
+
+  it('memory: remember, recall, forget — and the notes reach the AI context', async () => {
+    const { listMemory } = await import('../coachMemoryService');
+    const { buildContext } = await import('../ai/context');
+    let { state } = await sendMessage(await loadChat(), { text: 'Remember that I hate running' });
+    expect(lastCoach(state).text).toMatch(/Saved to my memory/);
+    ({ state } = await sendMessage(state, { text: 'Remember that I hate running' }));
+    expect(lastCoach(state).text).toMatch(/already remember/);
+    expect((await listMemory()).map((n) => n.text)).toEqual(['I hate running']);
+    expect(JSON.parse(await buildContext()).playerNotes).toEqual(['I hate running']);
+    ({ state } = await sendMessage(state, { text: 'What do you remember?' }));
+    expect(lastCoach(state).info?.[0].label).toBe('I hate running');
+    ({ state } = await sendMessage(state, { text: 'Forget the running note' }));
+    expect(lastCoach(state).text).toMatch(/Forgotten/);
+    expect(await listMemory()).toEqual([]);
+    expect(JSON.parse(await buildContext()).playerNotes).toBeUndefined();
+  });
+
+  it('private quests are masked in the AI context', async () => {
+    const { ensureToday } = await import('../game/dayService');
+    const { questRepository } = await import('@/repositories');
+    await ensureToday();
+    const q = (await questRepository.byDate(clock.today())).find((x) => x.status === 'pending')!;
+    await questRepository.put({ ...q, private: true, title: 'Secret thing' });
+    const { buildContext } = await import('../ai/context');
+    const ctx = await buildContext();
+    expect(ctx).not.toContain('Secret thing');
+  });
+});
