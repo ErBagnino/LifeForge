@@ -64,6 +64,7 @@ export const QuestCard = memo(function QuestCard({
   onPress,
   onOpen,
   now,
+  variant = 'card',
 }: {
   quest: Quest;
   petName: string;
@@ -71,7 +72,10 @@ export const QuestCard = memo(function QuestCard({
   onPress: () => void;
   onOpen: () => void;
   now: number;
+  /** `row`: a compact line for secondary quests (inside a grouped list). */
+  variant?: 'card' | 'row';
 }) {
+  const row = variant === 'row';
   const done = q.status === 'completed';
   const inactive = done || q.status === 'failed' || q.status === 'skipped';
   const hiddenUnrevealed = q.hidden && !done;
@@ -85,8 +89,8 @@ export const QuestCard = memo(function QuestCard({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cx('flex items-center gap-3 rounded-3xl bg-surface p-3 shadow-card', inactive && 'opacity-60')}
-      style={q.rarity !== 'common' && !inactive ? { boxShadow: `inset 0 0 0 1.5px ${RARITY_INFO[q.rarity].color}55, var(--lf-shadow)` } : undefined}
+      className={cx('flex items-center gap-3', row ? 'px-1 py-2' : 'rounded-3xl bg-surface p-3 shadow-card', inactive && 'opacity-60')}
+      style={!row && q.rarity !== 'common' && !inactive ? { boxShadow: `inset 0 0 0 1.5px ${RARITY_INFO[q.rarity].color}55, var(--lf-shadow)` } : undefined}
     >
       <CheckButton q={q} onPress={onPress} />
       <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen} aria-label={`Open ${title}`}>
@@ -94,11 +98,11 @@ export const QuestCard = memo(function QuestCard({
           <span className="text-[17px] leading-none" aria-hidden>
             {hiddenUnrevealed ? '❔' : q.icon}
           </span>
-          <span className={cx('truncate text-[15.5px] font-semibold', done && 'line-through decoration-2')}>{title}</span>
+          <span className={cx('truncate font-semibold', row ? 'text-[15px]' : 'text-[15.5px]', done && 'line-through decoration-2')}>{title}</span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
-          {q.kind !== 'scheduled' && q.kind !== 'first' ? <TierChip tier={q.tier} kind={q.kind} /> : q.tier !== 'optional' && <TierChip tier={q.tier} />}
-          <RarityChip rarity={q.rarity} />
+          {!row && (q.kind !== 'scheduled' && q.kind !== 'first' ? <TierChip tier={q.tier} kind={q.kind} /> : q.tier !== 'optional' && <TierChip tier={q.tier} />)}
+          {!row && <RarityChip rarity={q.rarity} />}
           {snoozed && <span className="font-semibold text-warn">⏰ {tsToHm(q.snoozedUntil!)}</span>}
           {!snoozed && q.scheduledTime && !done && <span className="num">🕐 {q.scheduledTime}</span>}
           {done && q.actualTime && <span className="num">✓ {q.actualTime}</span>}

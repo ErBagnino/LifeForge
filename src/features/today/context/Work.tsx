@@ -51,41 +51,43 @@ export function WorkStartCard() {
   const wd = weekday(today.date);
   const weekend = wd === 0 || wd === 6;
   if (weekend && !exp && !planned) return null;
+  const leave = exp?.start !== undefined ? `usually ~${String(Math.floor(exp.start / 60) % 24).padStart(2, '0')}:${String(exp.start % 60).padStart(2, '0')}` : 'the commute counts';
   return (
-    <Card className="mt-3">
-      <div className="flex items-center gap-3">
-        <span className="text-[28px]" aria-hidden>
-          💼
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-extrabold tracking-wider text-muted">WORK</div>
-          <div className="text-[14px] leading-snug">{exp?.start !== undefined ? `You usually leave around ${String(Math.floor(exp.start / 60) % 24).padStart(2, '0')}:${String(exp.start % 60).padStart(2, '0')}.` : 'Tap START when you leave home — the commute counts.'}</div>
-        </div>
-        <Button
-          className="shrink-0"
-          icon="play"
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            // act() also reschedules reminders, so nothing nags during work.
-            await act(startWork().then(() => ({ events: [] })));
-            setBusy(false);
-          }}
-        >
-          START
-        </Button>
+    <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface px-3 py-1.5 shadow-card">
+      <span className="text-[20px]" aria-hidden>
+        💼
+      </span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate text-[14px] font-semibold">Leaving for work?</div>
+        <div className="truncate text-[12px] text-muted">Tap when you leave · {leave}</div>
       </div>
       <button
         type="button"
-        className="mt-1 min-h-11 text-[13px] font-semibold text-muted"
+        className="hit-44 shrink-0 px-1 text-[12px] font-semibold text-muted"
         onClick={async () => {
           await setNoWork(true);
           await refresh();
         }}
       >
-        Not working today
+        Not today
       </button>
-    </Card>
+      <Button
+        size="sm"
+        variant="secondary"
+        className="shrink-0"
+        icon="play"
+        loading={busy}
+        aria-label="Start work"
+        onClick={async () => {
+          setBusy(true);
+          // act() also reschedules reminders, so nothing nags during work.
+          await act(startWork().then(() => ({ events: [] })));
+          setBusy(false);
+        }}
+      >
+        START
+      </Button>
+    </div>
   );
 }
 

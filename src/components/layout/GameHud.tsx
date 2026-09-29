@@ -15,19 +15,17 @@ import { Row, List } from '../ui/forms';
 import { InfoTip, type InfoKey } from '../ui/InfoTip';
 import { openAsk } from './AskSheet';
 
+/** A slim resource bar: icon, value and a thin track. Quiet on purpose — level and XP lead the HUD. */
 function Meter({ icon, value, max, color, label, id, tip, alert }: { icon: string; value: number; max: number; color: string; label: string; id?: string; tip?: InfoKey; alert?: boolean }) {
   return (
-    <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl bg-surface-2 px-2 py-1.5 min-[360px]:px-2.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
-      <span aria-hidden className={cx('text-[14px]', alert && 'lf-pulse')}>
+    <div id={id} data-tour={tip} className="flex min-w-0 flex-1 items-center gap-1.5" aria-label={`${label} ${Math.round(value)} of ${max}`}>
+      <span aria-hidden className={cx('text-[12px]', alert && 'lf-pulse')}>
         {icon}
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="num text-[13px] leading-none font-bold">
-          <AnimatedNumber value={value} />
-        </div>
-        <ProgressBar value={value / max} color={color} height={4} className="mt-1" />
-      </div>
-      {/* The ⓘ gives way to the number on very narrow phones (the tips stay reachable from the tour). */}
+      <ProgressBar value={value / max} color={color} height={5} className="min-w-0 flex-1" />
+      <span className="num w-7 shrink-0 text-right text-[12px] leading-none font-bold text-muted">
+        <AnimatedNumber value={value} />
+      </span>
       {tip && <InfoTip k={tip} className="max-[359px]:hidden" />}
     </div>
   );
@@ -40,50 +38,50 @@ export function GameHud() {
   const settings = useGame((s) => s.settings);
   const { level, into, needed, progress } = useLevel();
   const [menu, setMenu] = useState(false);
-  if (!player || !settings) return <div className="h-[120px] pt-safe" />;
+  if (!player || !settings) return <div className="h-[100px] pt-safe" />;
   const cls = classById(computeClassAffinities({ stats: player.stats, categoryCounts: {}, coreRate: 0, streak: player.streak.current, recoveryDays: 0, worldSpend: player.lifetime.coinsSpent })[0].classId);
 
   return (
-    <div className="px-safe pt-[calc(var(--safe-top)+10px)]">
+    <div className="px-safe pt-[calc(var(--safe-top)+8px)]">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => setMenu(true)} aria-label="Open profile menu" data-tour="profile" className="relative">
-          <Avatar config={player.avatar} size={48} ring={player.recoveryMode ? 'var(--lf-hp)' : 'var(--lf-accent)'} />
+        <button type="button" onClick={() => setMenu(true)} aria-label={`Open profile menu, level ${level}`} data-tour="profile" className="relative shrink-0">
+          <Avatar config={player.avatar} size={46} ring={player.recoveryMode ? 'var(--lf-hp)' : 'var(--lf-accent)'} />
+          <span className="num absolute -right-1 -bottom-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-bg bg-accent px-1 text-[11px] leading-none font-black text-on-accent" aria-hidden>
+            {level}
+          </span>
         </button>
         <div className="min-w-0 flex-1" id="hud-xp">
-          <div className="flex items-baseline gap-2">
-            <span className="num shrink-0 text-[13px] font-extrabold tracking-wider text-muted">
-              <span className="max-[359px]:hidden">LEVEL</span>
-              <span className="min-[360px]:hidden" aria-label="Level">LV</span>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-[13px] font-bold">
+              Level {level} <span className="font-semibold text-muted">· {cls.icon} {cls.name}</span>
             </span>
-            <AnimatedNumber value={level} className="shrink-0 text-[22px] leading-none font-extrabold" />
-            <span className="min-w-0 truncate text-[12px] font-semibold text-muted">
-              {cls.icon} {cls.name}
-            </span>
+            <span className="num shrink-0 text-[11px] font-semibold text-muted">{level >= MAX_LEVEL ? 'MAX' : `${formatCompact(into)}/${formatCompact(needed)}`}</span>
           </div>
-          <ProgressBar value={progress} color="linear-gradient(90deg, var(--lf-xp), #b18cff)" height={8} className="mt-1.5" label="XP to next level" />
-          <div className="num mt-0.5 text-[11px] font-semibold text-muted">
-            {level >= MAX_LEVEL ? 'Max level reached' : `${formatInt(into)} / ${formatInt(needed)} XP · ${Math.round(progress * 100)}%`}
-          </div>
+          <ProgressBar value={progress} color="linear-gradient(90deg, var(--lf-xp), #b18cff)" height={7} className="mt-1" label={level >= MAX_LEVEL ? 'Max level reached' : `XP to level ${level + 1}: ${Math.round(progress * 100)}%`} />
         </div>
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button type="button" onClick={() => openAsk()} aria-label="Ask LifeForge" data-tour="ask" className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/12 text-accent">
             <Icon name="mic" size={20} />
           </button>
-          <button type="button" onClick={() => navigate('/stats')} aria-label="Stats" data-tour="stats" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2">
+          <button type="button" onClick={() => navigate('/stats')} aria-label="Stats" data-tour="stats" className="flex h-11 w-9 items-center justify-center rounded-full text-muted">
             <Icon name="stats" size={19} />
           </button>
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2.5 flex items-center gap-3">
         <Meter icon="❤️" value={player.hp} max={100} color="var(--lf-hp)" label="HP" tip="hp" alert={player.hp <= 30} />
-        <Meter icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" tip="energy" />
-        <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`Streak ${player.streak.current} days`}>
-          <Flame size={16} dim={player.streak.current === 0} hot={player.streak.current >= 7} />
-          <span className="num text-[15px] font-bold">{player.streak.current}</span>
-        </div>
-        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex shrink-0 items-center gap-1 rounded-2xl bg-surface-2 px-2 min-[360px]:px-2.5" aria-label={`${formatInt(player.coins)} coins, open shop`}>
-          <span aria-hidden>🪙</span>
-          <AnimatedNumber value={player.coins} format={formatCompact} className="text-[15px] font-bold text-coin" />
+        <Meter id="hud-energy" icon="⚡" value={player.energy} max={player.maxEnergy} color="var(--lf-energy)" label="Energy" tip="energy" />
+        <button type="button" id="hud-coins" onClick={() => navigate('/world/shop')} className="hit-44 flex shrink-0 items-center gap-2 rounded-full bg-surface-2 px-2.5 py-1" aria-label={`Streak ${player.streak.current} days. ${formatInt(player.coins)} coins, open shop`}>
+          <span className="flex items-center gap-0.5">
+            <Flame size={13} dim={player.streak.current === 0} hot={player.streak.current >= 7} />
+            <span className="num text-[13px] font-bold">{player.streak.current}</span>
+          </span>
+          <span className="flex items-center gap-0.5">
+            <span aria-hidden className="text-[12px]">
+              🪙
+            </span>
+            <AnimatedNumber value={player.coins} format={formatCompact} className="text-[13px] font-bold text-coin" />
+          </span>
         </button>
       </div>
 

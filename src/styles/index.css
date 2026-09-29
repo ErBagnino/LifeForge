@@ -3,14 +3,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --lf-bg: #f2f2f7;
-  --lf-surface: #ffffff;
-  --lf-surface-2: #f4f4f8;
-  --lf-surface-3: #e9e9ef;
-  --lf-text: #0b0b10;
-  --lf-muted: #6e6e7a;
-  --lf-faint: #a1a1ab;
-  --lf-border: rgba(10, 10, 20, 0.07);
+  /* Light: warm stone surfaces. */
+  --lf-bg: #f3f1ed;
+  --lf-surface: #fffefb;
+  --lf-surface-2: #f2efe9;
+  --lf-surface-3: #e7e2da;
+  --lf-text: #16130f;
+  --lf-muted: #6f695f;
+  --lf-faint: #a39c91;
+  --lf-border: rgba(40, 30, 10, 0.08);
   --lf-accent: #ff5a1f;
   --lf-accent-2: #ff8a3d;
   --lf-on-accent: #ffffff;
@@ -22,9 +23,16 @@
   --lf-success: #28c76f;
   --lf-warn: #ff9f0a;
   --lf-danger: #ff3b30;
-  --lf-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 16px rgba(15, 15, 30, 0.04);
-  --lf-shadow-lg: 0 10px 40px rgba(15, 15, 30, 0.12);
-  --lf-tabbar: rgba(250, 250, 252, 0.82);
+  --lf-shadow: 0 1px 2px rgba(40, 28, 10, 0.05), 0 4px 16px rgba(40, 28, 10, 0.05);
+  --lf-shadow-lg: 0 10px 40px rgba(40, 28, 10, 0.14);
+  /* Raised: the one element that matters now (Right now card, primary actions). */
+  --lf-shadow-raised: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 -2px 0 rgba(0, 0, 0, 0.12) inset, 0 10px 28px -8px color-mix(in srgb, var(--lf-accent) 55%, transparent);
+  --lf-tabbar: rgba(250, 248, 244, 0.84);
+  /* Motion tokens: micro 100–180 ms, standard 200–300 ms, celebration 400–700 ms. */
+  --lf-dur-micro: 140ms;
+  --lf-dur-standard: 240ms;
+  --lf-dur-celebrate: 560ms;
+  --lf-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -36,19 +44,20 @@
 }
 
 .dark {
-  --lf-bg: #000000;
-  --lf-surface: #151518;
-  --lf-surface-2: #1e1e23;
-  --lf-surface-3: #2a2a31;
+  /* Dark: deep graphite, not pure black. */
+  --lf-bg: #0d0d0f;
+  --lf-surface: #17171b;
+  --lf-surface-2: #212126;
+  --lf-surface-3: #2c2c33;
   --lf-text: #f5f5f7;
   --lf-muted: #9d9daa;
   --lf-faint: #62626d;
   --lf-border: rgba(255, 255, 255, 0.08);
   --lf-xp: #9580ff;
   --lf-coin: #ffc233;
-  --lf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --lf-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
-  --lf-tabbar: rgba(18, 18, 22, 0.82);
+  --lf-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.45);
+  --lf-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.55);
+  --lf-tabbar: rgba(20, 20, 24, 0.84);
   color-scheme: dark;
 }
 
@@ -84,6 +93,7 @@
   --color-danger: var(--lf-danger);
   --shadow-card: var(--lf-shadow);
   --shadow-float: var(--lf-shadow-lg);
+  --shadow-raised: var(--lf-shadow-raised);
   --radius-4xl: 2rem;
 }
 

@@ -126,7 +126,7 @@ export default function PlanEditor() {
         Add training day
       </Button>
       {restDays < minRest && (
-        <p role="note" className="mt-3 rounded-2xl bg-warning/12 px-4 py-3 text-[13px] text-fg">
+        <p role="note" className="mt-3 rounded-2xl bg-warn/12 px-4 py-3 text-[13px] text-fg">
           This plan leaves {restDays} rest {restDays === 1 ? 'day' : 'days'} a week; your safety setting asks for at least {minRest}. Muscles grow while you recover — you can still save it.
         </p>
       )}

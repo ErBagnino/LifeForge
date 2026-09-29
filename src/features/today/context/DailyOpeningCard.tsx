@@ -38,8 +38,8 @@ export function DailyOpeningCard() {
   const awayDays = opening.lastVisit ? daysBetween(opening.lastVisit, today.date) : 0;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
-      <Card className="bg-gradient-to-br from-accent/10 to-xp/10">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-3">
+      <Card className="bg-gradient-to-br from-accent/12 to-xp/10 shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--lf-accent)_30%,transparent)]">
         {opening.welcomeBack && opening.lastVisit && (awayDays >= 7 ? (
           <div className="mb-3 rounded-2xl bg-surface p-3">
             <div className="text-[12px] font-extrabold tracking-[0.16em] text-accent">WELCOME BACK</div>
@@ -68,7 +68,7 @@ export function DailyOpeningCard() {
           </p>
         ))}
         <div className="text-[12px] font-extrabold tracking-[0.16em] text-accent">
-          {GREETING[opening.kind]}, {name}
+          RIGHT NOW · {GREETING[opening.kind]}, {name}
         </div>
         <div className="mt-1 text-[20px] leading-snug font-bold">{opening.late ? 'You’ve started late today.' : 'Ready?'}</div>
         {opening.late && <p className="mt-1 text-[14px] text-muted">The plan is adapted to the {formatDuration(view.availableMin)} left before bed.</p>}
@@ -109,26 +109,14 @@ export function DailyOpeningCard() {
           </button>
         )}
 
-        <dl className="num mt-2 grid grid-cols-2 gap-2 text-[13px]">
-          <div className="rounded-2xl bg-surface px-3 py-2">
-            <dt className="text-muted">Wake-up</dt>
-            <dd className="text-[16px] font-bold">{ctx.wakeUpTime ? hm(new Date(ctx.wakeUpTime).getHours() * 60 + new Date(ctx.wakeUpTime).getMinutes()) : '—'}</dd>
-          </div>
-          <div className="rounded-2xl bg-surface px-3 py-2">
-            <dt className="text-muted">Energy</dt>
-            <dd className="text-[16px] font-bold">{Math.round((player.energy / Math.max(1, player.maxEnergy)) * 100)}%</dd>
-          </div>
-          <div className="rounded-2xl bg-surface px-3 py-2">
-            <dt className="text-muted">Today’s difficulty</dt>
-            <dd className="text-[16px] font-bold">
-              {difficulty.icon} {difficulty.label}
-            </dd>
-          </div>
-          <div className="rounded-2xl bg-surface px-3 py-2">
-            <dt className="text-muted">Main objective</dt>
-            <dd className="text-[14px] leading-tight font-bold">{core.total ? `${core.total - core.done} core quests` : 'Your quests'}</dd>
-          </div>
-        </dl>
+        <ul className="num mt-2 flex flex-wrap gap-1.5 text-[12px] font-semibold" aria-label="Your day at a glance">
+          <li className="rounded-full bg-surface px-2.5 py-1">⏰ {ctx.wakeUpTime ? hm(new Date(ctx.wakeUpTime).getHours() * 60 + new Date(ctx.wakeUpTime).getMinutes()) : 'wake-up —'}</li>
+          <li className="rounded-full bg-surface px-2.5 py-1">⚡ {Math.round((player.energy / Math.max(1, player.maxEnergy)) * 100)}%</li>
+          <li className="rounded-full bg-surface px-2.5 py-1">
+            {difficulty.icon} {difficulty.label}
+          </li>
+          <li className="rounded-full bg-surface px-2.5 py-1">🎯 {core.total ? `${core.total - core.done} core quests` : 'your quests'}</li>
+        </ul>
         <Button block size="lg" className="mt-3" icon="play" onClick={() => void run(startDay())}>
           START DAY
         </Button>

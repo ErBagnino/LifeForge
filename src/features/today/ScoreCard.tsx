@@ -8,16 +8,16 @@ import type { ScoreBreakdown } from '@/types';
 
 const GRADE_COLOR: Record<string, string> = { S: '#ff9f0a', A: '#30d158', B: '#0a84ff', C: '#8e8e93', D: '#ff375f' };
 
-export function ScoreCard() {
+export function ScoreCard({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
   const log = useGame((s) => s.today?.log);
   const threshold = useGame((s) => (s.settings ? s.settings.rules.difficultyPresets[s.settings.difficulty].streakThreshold : 70));
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const score = log?.score ?? 0;
   const grade = scoreGrade(score);
   const coreLeft = (log?.core.total ?? 0) - (log?.core.done ?? 0);
 
   return (
-    <Card className="mt-4" data-tour="score" onClick={() => setOpen((v) => !v)} aria-label={`Today score ${score} of 100. Tap for breakdown`}>
+    <Card className={defaultOpen ? '' : 'mt-4'} onClick={() => setOpen((v) => !v)} aria-label={`Today score ${score} of 100. Tap for breakdown`}>
       <div className="flex items-center gap-4">
         <Ring value={score / 100} size={108} stroke={11} color={score >= threshold ? 'var(--lf-success)' : 'var(--lf-accent)'} label={`Score ${score}`}>
           <span className="num text-[34px] leading-none font-extrabold">{score}</span>
