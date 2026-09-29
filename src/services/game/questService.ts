@@ -1,4 +1,6 @@
 import { countersForQuest, C } from '@/domain/counters';
+import { computeMomentum } from '@/domain/momentum';
+import { perkXpPct } from '@/domain/perks';
 import { hpForQuest } from '@/domain/hp';
 import { evaluateRules, type Facts } from '@/domain/rulesEngine';
 import { applyMultipliers, isRecoveryCategory, rewardMultipliers } from '@/domain/rewards';
@@ -6,6 +8,7 @@ import { countedQuests, tierCount } from '@/domain/score';
 import { activityStreak } from '@/domain/streak';
 import {
   activityRepository,
+  metaRepository,
   questRepository,
   routineRepository,
   suggestionRepository,
@@ -38,6 +41,11 @@ export async function loadDay(date: string): Promise<{ day: Quest[]; long: Quest
 export async function applyCompletion(tx: GameTx, quest: Quest, actualTime?: TimeHM): Promise<Quest> {
   const rules = tx.settings.rules;
   const bonuses = tx.bonuses;
+  // Perks and momentum: small XP-only bonuses, recorded in `earned`, so Undo removes them too.
+  const picks = (await metaRepository.get<string[]>('perks')) ?? [];
+  const doneToday = (await questRepository.byDate(tx.date)).filter((q) => q.id !== quest.id && q.status === 'completed' && q.completedAt).map((q) => q.completedAt!);
+  const streakNow = computeMomentum(doneToday, tx.now);
+  const combo = actualTime ? 0 : streakNow.combo + 1;
   const multipliers = rewardMultipliers(
     {
       now: tx.now,
@@ -49,6 +57,8 @@ export async function applyCompletion(tx: GameTx, quest: Quest, actualTime?: Tim
       categoryXpPct: bonuses.xpPctByCategory[quest.category] ?? 0,
       categoryCoinPct: bonuses.coinPctByCategory[quest.category] ?? 0,
       recoveryMode: tx.player.recoveryMode,
+      perkXpPct: perkXpPct(picks, tx.level, quest.category, new Date(tx.now).getHours()),
+      combo,
     },
     rules.xp,
   );

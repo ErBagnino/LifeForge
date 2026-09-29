@@ -34,6 +34,7 @@ const ProfileScreen = lazy(() => import('@/features/profile/ProfileScreen'));
 const AchievementsScreen = lazy(() => import('@/features/profile/AchievementsScreen'));
 const MasteryScreen = lazy(() => import('@/features/profile/MasteryScreen'));
 const JourneyScreen = lazy(() => import('@/features/stats/JourneyScreen'));
+const CollectionScreen = lazy(() => import('@/features/profile/CollectionScreen'));
 const PlayTimeScreen = lazy(() => import('@/features/play/PlayTimeScreen'));
 const SearchScreen = lazy(() => import('@/features/search/SearchScreen'));
 const SettingsScreen = lazy(() => import('@/features/settings/SettingsScreen'));
@@ -184,6 +185,7 @@ function Boot() {
           <Route path="achievements" element={<AchievementsScreen />} />
           <Route path="mastery" element={<MasteryScreen />} />
           <Route path="journey" element={<JourneyScreen />} />
+          <Route path="collection" element={<CollectionScreen />} />
           <Route path="play" element={<PlayTimeScreen />} />
           <Route path="search" element={<SearchScreen />} />
           <Route path="coach" element={<CoachScreen />} />

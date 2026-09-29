@@ -5,9 +5,10 @@ import { ProgressBar } from '@/components/ui/progress';
 import { cx } from '@/components/ui/primitives';
 import type { Quest, Routine } from '@/types';
 
-/** A routine shown as one collapsible card instead of many small quests. */
+/** A routine as a mini mission: a chain of steps with the next one highlighted and a completion bonus. */
 export function RoutineCard({ routine, quests, done, children }: { routine: Routine; quests: Quest[]; done: boolean; children: ReactNode }) {
   const completed = quests.filter((q) => q.status === 'completed').length;
+  const next = quests.find((q) => q.status === 'pending');
   const [open, setOpen] = useState(false);
   return (
     <div className={cx('overflow-hidden rounded-3xl bg-surface shadow-card', done && 'opacity-70')}>
@@ -25,12 +26,20 @@ export function RoutineCard({ routine, quests, done, children }: { routine: Rout
             </span>
           </span>
           {!open && (
-            <span className="mt-1.5 flex flex-wrap gap-1 text-[13px]" aria-hidden>
-              {quests.map((q) => (
-                <span key={q.id} className={q.status === 'completed' ? 'opacity-40' : ''}>
-                  {q.icon}
+            <span className="mt-2 flex items-center" aria-hidden>
+              {quests.map((q, i) => (
+                <span key={q.id} className="flex items-center">
+                  {i > 0 && <span className={cx('h-[2px] w-2.5 rounded-full', q.status === 'completed' || quests[i - 1].status === 'completed' ? 'bg-accent/60' : 'bg-surface-3')} />}
+                  <span className={cx('flex h-6 w-6 items-center justify-center rounded-full text-[12px]', q.status === 'completed' ? 'bg-accent/20' : q === next ? 'bg-accent/15 ring-2 ring-accent/60' : 'bg-surface-2 opacity-60')}>
+                    {q.status === 'completed' ? '✓' : q.icon}
+                  </span>
                 </span>
               ))}
+            </span>
+          )}
+          {!open && next && !done && (
+            <span className="mt-1.5 block truncate text-[12px] text-muted">
+              Step {completed + 1} of {quests.length}: <span className="font-semibold text-fg">{next.title}</span>
             </span>
           )}
         </span>

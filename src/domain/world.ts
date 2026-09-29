@@ -81,3 +81,12 @@ export function worldCollections(input: { buildings: Pick<Building, 'id' | 'name
   }
   return out;
 }
+
+/** Cosmetic rarity follows its price (earned coins only — rarity is never random). */
+export function priceRarity(price: number): 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' {
+  if (price >= 2000) return 'legendary';
+  if (price >= 900) return 'epic';
+  if (price >= 400) return 'rare';
+  if (price >= 150) return 'uncommon';
+  return 'common';
+}

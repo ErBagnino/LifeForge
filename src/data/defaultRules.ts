@@ -176,7 +176,7 @@ export const DEFAULT_RULES: GameRules = {
     procrastinationCoins: 2,
   },
   generator: {
-    sideQuestsByWorkload: { low: 4, medium: 2, high: 1 },
+    sideQuestsByWorkload: { low: 2, medium: 1, high: 1 },
     maxDurationByWorkload: { low: 45, medium: 20, high: 10 },
     maxCoreByWorkload: { low: 8, medium: 5, high: 4 },
     maxImportantByWorkload: { low: 8, medium: 5, high: 3 },

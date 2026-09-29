@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ProgressBar } from '@/components/ui/progress';
 import { Button, cx } from '@/components/ui/primitives';
@@ -8,7 +8,10 @@ import { nextUnlocks, oneMoreThing } from '@/domain/homeFlow';
 import { MAX_LEVEL } from '@/domain/level';
 import { tierCount } from '@/domain/score';
 import { useAsync, useLevel, useNow } from '@/hooks';
-import { achievementRepository, activityRepository, statsRepository } from '@/repositories';
+import { achievementRepository, activityRepository, metaRepository, statsRepository } from '@/repositories';
+import { weeklyReview } from '@/services/insightsService';
+import { loadSeason } from '@/services/progressService';
+import { formatDate, shiftDate, weekStart } from '@/utils/date';
 import { clock } from '@/services/clock';
 import { resolveText } from '@/services/game/questFactory';
 import { startActivityNow } from '@/services/game/questService';
@@ -173,3 +176,159 @@ export function WorldPreview() {
 function buildingCostOf(b: { baseCost: number; costGrowth: number; level: number }) {
   return buildingCost(b, b.level + 1);
 }
+
+/** SEASON: a 30-day arc with cosmetic badges; permanent progress is never affected. */
+export function SeasonCard() {
+  const { data: s } = useAsync(() => loadSeason(), []);
+  if (!s) return null;
+  const prevPts = s.reached.at(-1)?.points ?? 0;
+  const target = s.next?.points ?? prevPts;
+  return (
+    <section aria-label={`Season ${s.n}`} className="mt-3 rounded-[24px] bg-surface p-4 shadow-card">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-[12px] font-extrabold tracking-[0.16em] text-muted">
+          SEASON {String(s.n).padStart(2, '0')} · {s.name.toUpperCase()}
+        </div>
+        <span className="num shrink-0 text-[12px] text-muted">{s.daysLeft > 0 ? `${s.daysLeft} days left` : 'last day'}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <div className="flex shrink-0 gap-0.5 text-[18px]" aria-label={`${s.reached.length} of 4 season badges`}>
+          {['🥉', '🥈', '🥇', '🏆'].map((icon, i) => (
+            <span key={icon} className={i < s.reached.length ? '' : 'opacity-25 grayscale'} aria-hidden>
+              {icon}
+            </span>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <ProgressBar value={s.next ? (s.points - prevPts) / Math.max(1, target - prevPts) : 1} height={6} color="var(--lf-xp)" />
+          <div className="num mt-1 text-[12px] text-muted">{s.next ? `${s.points} / ${s.next.points} season points → ${s.next.badge}` : `${s.points} season points · all badges earned`}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * DAY COMPLETE: shown once, the first time the core is done and the score crosses the streak
+ * line. Short and satisfying: score, XP, coins, streak.
+ */
+export function DayCompleteMoment() {
+  const today = useGame((s) => s.today);
+  const player = useGame((s) => s.player);
+  const threshold = useGame((s) => (s.settings ? s.settings.rules.difficultyPresets[s.settings.difficulty].streakThreshold : 70));
+  const [open, setOpen] = useState(false);
+  const date = today?.date;
+  const core = today ? tierCount(today.quests, 'core') : { done: 0, total: 0 };
+  const score = today?.log?.score ?? 0;
+  const strong = !!today && core.total > 0 && core.done === core.total && score >= threshold;
+  useEffect(() => {
+    if (!strong || !date) return;
+    let alive = true;
+    void metaRepository.get<string>('dayCompleteShown').then((shown) => {
+      if (alive && shown !== date) {
+        setOpen(true);
+        void metaRepository.set('dayCompleteShown', date);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [strong, date]);
+  if (!today || !player) return null;
+  return (
+    <Sheet open={open} onClose={() => setOpen(false)} title="Day complete">
+      <div className="text-center">
+        <div className="text-[44px]" aria-hidden>
+          🏁
+        </div>
+        <div className="text-[13px] font-extrabold tracking-[0.18em] text-accent">DAY COMPLETE</div>
+        <div className="num mt-1 text-[48px] leading-none font-black">{score}</div>
+        <div className="text-[12px] text-muted">score · core {core.done}/{core.total}</div>
+        <div className="num mt-4 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-surface-2 py-2.5">
+            <div className="text-[18px] font-extrabold text-xp">+{today.log?.xp ?? 0}</div>
+            <div className="text-[11px] text-muted">XP today</div>
+          </div>
+          <div className="rounded-2xl bg-surface-2 py-2.5">
+            <div className="text-[18px] font-extrabold text-coin">+{today.log?.coins ?? 0}</div>
+            <div className="text-[11px] text-muted">coins today</div>
+          </div>
+          <div className="rounded-2xl bg-surface-2 py-2.5">
+            <div className="text-[18px] font-extrabold">🔥 {player.streak.current + (today.log?.success ? 0 : 1)}</div>
+            <div className="text-[11px] text-muted">streak tonight</div>
+          </div>
+        </div>
+        <p className="mt-3 text-[13px] text-muted">Everything else today is a bonus. Rest counts too.</p>
+        <Button block className="mt-3" onClick={() => setOpen(false)}>
+          Nice
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** WEEK COMPLETE: once at the start of a new week, if last week had real days in it. */
+export function WeekCompleteMoment() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const { data } = useAsync(async () => {
+    const today = clock.today();
+    const lastWeekDay = shiftDate(weekStart(today), -1);
+    const key = weekStart(lastWeekDay);
+    if ((await metaRepository.get<string>('weekCompleteShown')) === key) return undefined;
+    const start = await metaRepository.get<string>('adventureStart');
+    if (!start || start > lastWeekDay) return undefined;
+    const w = await weeklyReview(lastWeekDay);
+    if (w.logs.filter((l) => l.closed).length < 2) return undefined;
+    const best = [...w.logs].filter((l) => l.closed).sort((a, b) => b.score - a.score)[0];
+    return { key, w, best };
+  }, [], { live: false });
+  useEffect(() => {
+    if (data) {
+      setOpen(true);
+      void metaRepository.set('weekCompleteShown', data.key);
+    }
+  }, [data]);
+  if (!data) return null;
+  const { w, best } = data;
+  return (
+    <Sheet open={open} onClose={() => setOpen(false)} title="Week complete">
+      <div className="text-center">
+        <div className="text-[13px] font-extrabold tracking-[0.18em] text-accent">WEEK COMPLETE</div>
+        <div className="mt-1 text-[13px] text-muted">
+          {formatDate(w.from, 'd MMM')} – {formatDate(w.to, 'd MMM')}
+        </div>
+      </div>
+      <div className="num mt-3 grid grid-cols-2 gap-2">
+        {[
+          ['⭐', 'Best day', best ? `${formatDate(best.date, 'EEE')} · ${best.score}` : '—'],
+          ['✨', 'XP', `+${w.xp.toLocaleString('en-US')}`],
+          ['🪙', 'Coins', `+${w.coins.toLocaleString('en-US')}`],
+          ['🏋️', 'Workouts', String(w.workouts)],
+          ['✅', 'Successful days', `${w.logs.filter((l) => l.success).length}/7`],
+          ['🏅', 'Achievements', String(w.achievements.length)],
+        ].map(([icon, label, value]) => (
+          <div key={label} className="rounded-2xl bg-surface-2 px-3 py-2.5">
+            <div className="text-[12px] text-muted">
+              {icon} {label}
+            </div>
+            <div className="text-[17px] font-extrabold">{value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setOpen(false);
+            navigate('/review/week');
+          }}
+        >
+          Full review
+        </Button>
+        <Button onClick={() => setOpen(false)}>NEXT WEEK</Button>
+      </div>
+    </Sheet>
+  );
+}
+

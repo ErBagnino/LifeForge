@@ -7,6 +7,7 @@ import { DAILY_WEIGHTS, MASTERY_MAX_LEVEL, type TrackMastery } from '@/domain/ma
 import { useAsync } from '@/hooks';
 import { equipTitle, getEquippedTitle, loadMastery } from '@/services/progressService';
 import { useGame } from '@/store/gameStore';
+import { PerksCard } from './PerksCard';
 import { formatDate } from '@/utils/date';
 
 /** Mastery: ten life tracks that grow from real completions, with equippable perk titles. */
@@ -16,7 +17,7 @@ export default function MasteryScreen() {
   const [open, setOpen] = useState<TrackMastery | null>(null);
   if (!data) {
     return (
-      <Screen back title="Mastery">
+      <Screen back title="Mastery & perks">
         <Skeleton className="mt-3 h-24" />
         <Skeleton className="mt-2 h-24" />
       </Screen>
@@ -31,7 +32,8 @@ export default function MasteryScreen() {
   };
 
   return (
-    <Screen back title="Mastery" subtitle="Grows with every day you show up — spreading effort over days counts more than grinding one afternoon.">
+    <Screen back title="Mastery & perks" subtitle="Grows with every day you show up — spreading effort over days counts more than grinding one afternoon.">
+      <PerksCard />
       <Card className="mt-3">
         <div className="text-[12px] font-semibold text-muted uppercase">Equipped title</div>
         <div className="mt-1 text-[18px] font-extrabold">{data.title ? data.title.title : 'None yet'}</div>

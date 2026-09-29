@@ -56,3 +56,19 @@ describe('progress service', () => {
     expect(j.milestones.map((m) => m.kind)).toContain('start');
   });
 });
+
+describe('momentum bonus in the game loop', () => {
+  it('second quest in a row earns +5% XP; undo returns exactly what was earned', async () => {
+    const { uncompleteQuest } = await import('../game/questService');
+    const pending = (await questRepository.byDate(clock.today())).filter((q) => q.status === 'pending' && !q.metric && !q.goal && q.kind !== 'workout' && q.xp >= 20);
+    const [a, b] = pending;
+    const questXp = async () => (await getDb().ledger.toArray()).filter((l) => l.refId === b.id && l.type === 'xp').reduce((s, l) => s + l.amount, 0);
+    await completeQuest(a.id);
+    await completeQuest(b.id);
+    const done = (await questRepository.get(b.id))!;
+    expect(done.earned!.xp).toBeGreaterThan(b.xp); // momentum ×2
+    expect(await questXp()).toBe(done.earned!.xp);
+    await uncompleteQuest(b.id);
+    expect(await questXp()).toBe(0); // bonus included, nothing left behind
+  });
+});

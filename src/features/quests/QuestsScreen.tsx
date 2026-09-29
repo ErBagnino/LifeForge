@@ -191,13 +191,14 @@ function LibraryTab() {
   const today = useGame((s) => s.today);
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [cat, setCat] = useState<ActivityCategory | 'all'>('all');
+  const [cat, setCat] = useState<ActivityCategory | 'all' | 'quick'>('all');
   const { data } = useAsync(() => activityRepository.active(), []);
   const onBoard = new Set(today?.quests.filter((q) => q.status !== 'moved').map((q) => q.activityId));
   const list = useMemo(
     () =>
       (data ?? [])
-        .filter((a) => (cat === 'all' || a.category === cat) && resolveText(a.name, pet).toLowerCase().includes(query.toLowerCase()))
+        // Quick wins: 5–15 minute things for busy or low-energy days (never metric or private ones).
+        .filter((a) => (cat === 'all' || (cat === 'quick' ? a.durationMin >= 5 && a.durationMin <= 15 && !a.metric && !a.tags?.includes('private') : a.category === cat)) && resolveText(a.name, pet).toLowerCase().includes(query.toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [data, cat, query, pet],
   );
@@ -205,9 +206,9 @@ function LibraryTab() {
     <div className="mt-3">
       <TextInput value={query} onChange={setQuery} placeholder="Search activities…" aria-label="Search activities" type="search" voice />
       <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1">
-        {(['all', ...CATEGORIES] as const).map((c) => (
+        {(['all', 'quick', ...CATEGORIES] as const).map((c) => (
           <button key={c} type="button" onClick={() => setCat(c)} className={cx('h-11 shrink-0 rounded-full px-3.5 text-[13px] font-semibold', cat === c ? 'bg-accent text-on-accent' : 'bg-surface shadow-card')}>
-            {c === 'all' ? 'All' : `${CATEGORY_INFO[c].icon} ${CATEGORY_INFO[c].label}`}
+            {c === 'all' ? 'All' : c === 'quick' ? '⚡ Quick wins · 5–15 min' : `${CATEGORY_INFO[c].icon} ${CATEGORY_INFO[c].label}`}
           </button>
         ))}
       </div>

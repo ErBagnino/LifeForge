@@ -159,6 +159,7 @@ export default function ProfileScreen() {
         <Row icon="🏅" title="Achievements" onClick={() => navigate('/achievements')} />
         <Row icon="🌿" title="Mastery" onClick={() => navigate('/mastery')} />
         <Row icon="🧭" title="Journey" onClick={() => navigate('/journey')} />
+        <Row icon="🗃️" title="Collection" onClick={() => navigate('/collection')} />
         <Row icon="🏆" title="Personal records" onClick={() => navigate('/stats/records')} />
         <Row icon="⚙️" title="Settings" onClick={() => navigate('/settings')} />
       </List>

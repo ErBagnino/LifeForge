@@ -43,7 +43,7 @@ export const RESET_INFO: Record<ResetKind, { title: string; deletes: string[]; k
   },
   game: {
     title: 'Reset game progress',
-    deletes: ['Level, XP and coins', 'HP, energy, streaks and inventory', 'Unlocked achievements and counters', 'Tycoon rooms and owned cosmetics', 'Mastery, equipped title and achievement showcase'],
+    deletes: ['Level, XP and coins', 'HP, energy, streaks and inventory', 'Unlocked achievements and counters', 'Tycoon rooms and owned cosmetics', 'Mastery, perks, equipped title and achievement showcase'],
     keeps: ['History: logs, meals, workouts, day results', 'Settings, activities, routines and plans', 'Coach memory notes'],
   },
   all: {
@@ -137,6 +137,7 @@ export async function runReset(kind: ResetKind): Promise<ServiceResult> {
         await metaRepository.set('progressSince', today);
         await metaRepository.remove('equippedTitle');
         await metaRepository.remove('achievementShowcase');
+        await metaRepository.remove('perks');
       });
       break;
     case 'all':

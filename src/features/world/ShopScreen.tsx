@@ -4,6 +4,11 @@ import { Field, NumberInput, Segmented, Select, TextInput } from '@/components/u
 import { Button, Card, Chip, EmptyState, SectionTitle, cx } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { ACCENTS, SHOP_ITEMS } from '@/data/cosmetics';
+import { RARITY_INFO } from '@/data/categories';
+import { buildBlockers, buildingCost } from '@/domain/tycoon';
+import { priceRarity } from '@/domain/world';
+import { buildOrUpgrade } from '@/services/tycoonService';
+import { BuildingPreview } from './Diorama';
 import { canRevive } from '@/domain/streak';
 import { useAsync, useLevel } from '@/hooks';
 import { tycoonRepository } from '@/repositories';
@@ -13,7 +18,7 @@ import { useGame } from '@/store/gameStore';
 import type { Cosmetic, RealReward, RewardKind } from '@/types';
 import { uid } from '@/utils/id';
 
-type Tab = 'items' | 'cosmetics' | 'rewards';
+type Tab = 'items' | 'cosmetics' | 'world' | 'rewards';
 
 export default function ShopScreen() {
   const [tab, setTab] = useState<Tab>('items');
@@ -27,12 +32,14 @@ export default function ShopScreen() {
         onChange={setTab}
         options={[
           { value: 'items', label: '🎒 Items' },
-          { value: 'cosmetics', label: '🎨 Cosmetics' },
+          { value: 'cosmetics', label: '🎨 Style' },
+          { value: 'world', label: '🏠 World' },
           { value: 'rewards', label: '🎁 Rewards' },
         ]}
       />
       {tab === 'items' && <ItemsTab />}
       {tab === 'cosmetics' && <CosmeticsTab />}
+      {tab === 'world' && <WorldTab />}
       {tab === 'rewards' && <RewardsTab />}
     </Screen>
   );
@@ -111,6 +118,7 @@ function CosmeticsTab() {
             <div className="grid grid-cols-3 gap-2">
               {items.map((c) => {
                 const locked = !!c.unlockLevel && level < c.unlockLevel;
+                const rarity = RARITY_INFO[priceRarity(c.price)];
                 const swatch = c.type === 'hairColor' || c.type === 'outfitColor' || c.type === 'background';
                 return (
                   <button
@@ -118,14 +126,21 @@ function CosmeticsTab() {
                     type="button"
                     disabled={locked && !c.owned}
                     onClick={() => void run(c.owned ? equipCosmetic(c.id) : buyCosmetic(c.id))}
-                    className={cx('flex flex-col items-center rounded-3xl bg-surface p-3 text-center shadow-card', c.equipped && 'ring-2 ring-accent', locked && !c.owned && 'opacity-50')}
+                    aria-label={`${c.name}, ${rarity.label}, ${c.owned ? (c.equipped ? 'equipped' : 'owned') : locked ? `unlocks at level ${c.unlockLevel}` : `${c.price} coins`}`}
+                    className={cx('relative flex flex-col items-center rounded-3xl bg-surface p-3 text-center shadow-card', c.equipped && 'ring-2 ring-accent', locked && !c.owned && 'opacity-50')}
+                    style={!c.equipped && c.price > 0 ? { boxShadow: `inset 0 0 0 1.5px ${rarity.color}55, var(--lf-shadow)` } : undefined}
                   >
+                    {c.price > 0 && (
+                      <span className="absolute top-1.5 right-2 text-[9px] font-extrabold tracking-wide uppercase" style={{ color: rarity.color }}>
+                        {rarity.label}
+                      </span>
+                    )}
                     {swatch ? (
-                      <span className="h-9 w-9 rounded-full border border-line" style={{ background: c.value }} />
+                      <span className="mt-2 h-9 w-9 rounded-full border border-line" style={{ background: c.value }} />
                     ) : c.type === 'theme' ? (
-                      <span className="h-9 w-9 rounded-full" style={{ background: ACCENTS[c.value]?.color }} />
+                      <span className="mt-2 h-9 w-9 rounded-full" style={{ background: ACCENTS[c.value]?.color }} />
                     ) : (
-                      <span className="text-[30px] leading-9">{c.type === 'decoration' ? c.value : c.icon}</span>
+                      <span className="mt-2 text-[30px] leading-9">{c.type === 'decoration' ? c.value : c.icon}</span>
                     )}
                     <span className="mt-1 line-clamp-1 text-[12px] font-semibold">{c.name}</span>
                     <span className={cx('num text-[11px] font-bold', c.owned ? 'text-success' : player.coins >= c.price ? 'text-coin' : 'text-muted')}>
@@ -136,6 +151,45 @@ function CosmeticsTab() {
               })}
             </div>
           </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** World: every room's next level with a preview — the one primary action here is UPGRADE. */
+function WorldTab() {
+  const player = useGame((s) => s.player)!;
+  const buildings = useGame((s) => s.buildings);
+  const act = useGame((s) => s.act);
+  const { level } = useLevel();
+  const hour = new Date(clock.now()).getHours();
+  const rows = buildings
+    .map((b) => ({ b, cost: b.level < b.maxLevel ? buildingCost(b, b.level + 1) : 0, blockers: buildBlockers(b, level, player.coins, buildings) }))
+    .sort((x, y) => Number(x.b.level >= x.b.maxLevel) - Number(y.b.level >= y.b.maxLevel) || x.blockers.length - y.blockers.length || x.cost - y.cost);
+  return (
+    <div className="mt-3 space-y-2">
+      {rows.map(({ b, cost, blockers }) => {
+        const maxed = b.level >= b.maxLevel;
+        const lvlLock = blockers.find((x) => x.type === 'playerLevel');
+        return (
+          <Card key={b.id} className="flex items-center gap-3 !p-3">
+            <div className="w-[76px] shrink-0">
+              <BuildingPreview building={b} level={maxed ? b.level : b.level + 1} hour={hour} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-bold">
+                {b.icon} {b.name}
+              </div>
+              <div className="text-[12px] text-muted">{maxed ? `Max level ${b.maxLevel}` : b.level ? `Lv ${b.level} → ${b.level + 1}` : 'Build it'}</div>
+              {!maxed && lvlLock && lvlLock.type === 'playerLevel' && <div className="text-[12px] font-semibold text-muted">🔒 Player level {lvlLock.required}</div>}
+            </div>
+            {!maxed && (
+              <Button size="sm" disabled={blockers.length > 0} onClick={() => void act(buildOrUpgrade(b.id))} aria-label={`${b.level ? 'Upgrade' : 'Build'} ${b.name} for ${cost} coins`}>
+                {cost.toLocaleString('en-US')} 🪙
+              </Button>
+            )}
+          </Card>
         );
       })}
     </div>

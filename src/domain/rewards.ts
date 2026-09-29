@@ -12,6 +12,7 @@ import type {
   XpRules,
 } from '@/types';
 import { clamp, roundTo } from '@/utils/math';
+import { momentumXpPct } from './perks';
 
 export interface QuestValueInput {
   difficulty: Difficulty;
@@ -122,6 +123,10 @@ export interface MultiplierContext {
   categoryXpPct: number;
   categoryCoinPct: number;
   recoveryMode: boolean;
+  /** Chosen perks that apply to this completion (XP %). */
+  perkXpPct?: number;
+  /** Momentum combo length this completion creates (2 = second in a row). */
+  combo?: number;
 }
 
 /** Every completion-time multiplier, labelled so the UI can explain the numbers. */
@@ -148,6 +153,9 @@ export function rewardMultipliers(ctx: MultiplierContext, rules: XpRules): Multi
       out.push({ label: e.label, value: e.coinMultiplier, applies: 'coins' });
     }
   }
+  if (ctx.perkXpPct && ctx.perkXpPct > 0) out.push({ label: 'Perk', value: 1 + ctx.perkXpPct / 100, applies: 'xp' });
+  const momentum = momentumXpPct(ctx.combo ?? 0);
+  if (momentum > 0) out.push({ label: `Momentum ×${ctx.combo}`, value: 1 + momentum / 100, applies: 'xp' });
   if (ctx.recoveryMode) out.push({ label: 'Comeback', value: 1.15, applies: 'xp' });
   return out;
 }

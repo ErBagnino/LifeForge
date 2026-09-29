@@ -106,6 +106,8 @@ export function sideQuestBudget(input: BudgetInput, rules: GeneratorRules): Side
     count = Math.min(count, 1);
     maxDuration = Math.min(maxDuration, 15);
   }
+  // One good side quest by default; more only when energy and free time clearly allow it.
+  if (count > 1 && !(input.energyAfterCore >= 60 && input.freeAfterQuestsMin >= 120)) count = 1;
   // Never suggest more than the free time can realistically hold.
   const byTime = Math.floor(input.freeAfterQuestsMin / Math.max(5, maxDuration * 0.6));
   count = clamp(Math.min(count, byTime), 0, 6);

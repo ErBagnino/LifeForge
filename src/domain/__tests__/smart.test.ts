@@ -57,6 +57,14 @@ describe('adaptive difficulty', () => {
     expect(b('critical', 'low').count).toBe(0);
   });
 
+  it('one good side quest unless energy and free time clearly allow more', () => {
+    const b = (energyAfterCore: number, freeAfterQuestsMin: number) =>
+      sideQuestBudget({ workloadLevel: 'low', state: 'balanced', preset: rules.difficultyPresets.normal, extraSlots: 2, energyAfterCore, freeAfterQuestsMin, dayType: 'free' }, rules.generator).count;
+    expect(b(40, 300)).toBe(1);
+    expect(b(80, 60)).toBe(1);
+    expect(b(80, 300)).toBeGreaterThan(1);
+  });
+
   it('never proposes more side quests than time allows', () => {
     const b = sideQuestBudget(
       { workloadLevel: 'low', state: 'too_easy', preset: rules.difficultyPresets.insane, extraSlots: 2, energyAfterCore: 90, freeAfterQuestsMin: 20, dayType: 'free' },

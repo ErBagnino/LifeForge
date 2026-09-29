@@ -176,3 +176,38 @@ describe('world events and collections', () => {
     expect(byId.decor).toBeUndefined();
   });
 });
+
+describe('perks and momentum bonus', () => {
+  it('slots, validation and category/time matching', async () => {
+    const { perkSlots, validPicks, perkXpPct, momentumXpPct } = await import('../perks');
+    expect(perkSlots(4)).toBe(0);
+    expect(perkSlots(12)).toBe(2);
+    expect(validPicks(['training_focus', 'training_focus', 'nope', 'morning_momentum', 'home_keeper'], 12)).toEqual(['training_focus', 'morning_momentum']);
+    expect(perkXpPct(['training_focus', 'morning_momentum'], 12, 'fitness', 14)).toBe(8);
+    expect(perkXpPct(['training_focus', 'morning_momentum'], 12, 'fitness', 8)).toBe(18);
+    expect(perkXpPct(['training_focus'], 3, 'fitness', 14)).toBe(0); // no slot yet
+    expect([1, 2, 3, 7].map(momentumXpPct)).toEqual([0, 5, 10, 10]);
+  });
+  it('multipliers are XP-only and labelled', async () => {
+    const { rewardMultipliers, applyMultipliers } = await import('../rewards');
+    const { DEFAULT_RULES } = await import('@/data/defaultRules');
+    const m = rewardMultipliers({ now: 0, date: '2026-01-01', streak: 0, preset: { ...DEFAULT_RULES.difficultyPresets.normal, rewardMultiplier: 1 }, boosts: [], effects: [], categoryXpPct: 0, categoryCoinPct: 0, recoveryMode: false, perkXpPct: 8, combo: 3 }, DEFAULT_RULES.xp);
+    expect(m.map((x) => x.label)).toEqual(['Perk', 'Momentum ×3']);
+    expect(applyMultipliers({ xp: 100, coins: 50 }, m)).toEqual({ xp: 119, coins: 50 });
+  });
+});
+
+describe('seasons', () => {
+  const day = (date: string, done: number, success: boolean, workouts = 0) => ({ date, core: { done, total: done }, important: { done: 0, total: 0 }, optional: { done: 0, total: 0 }, success, closed: true, workouts });
+  it('30-day windows from the adventure start, points from real days', async () => {
+    const { seasonFor, dayPoints, pastSeasonBadges } = await import('../season');
+    expect(dayPoints(day('x', 20, true, 1))).toBe(120 + 50 + 30); // quests capped at 12
+    const s = seasonFor('2026-01-01', '2026-01-05', [day('2026-01-01', 5, true), day('2026-01-02', 3, false), day('2025-12-31', 9, true)]);
+    expect(s).toMatchObject({ n: 1, name: 'Foundation', day: 5, points: 50 + 50 + 30, daysLeft: 25 });
+    expect(s.next?.badge).toBe('Bronze');
+    const s2 = seasonFor('2026-01-01', '2026-01-31', []);
+    expect(s2).toMatchObject({ n: 2, name: 'Momentum', start: '2026-01-31', day: 1, points: 0 });
+    const logs = Array.from({ length: 30 }, (_, i) => day(`2026-01-${String(i + 1).padStart(2, '0')}`, 8, true, 1));
+    expect(pastSeasonBadges('2026-01-01', '2026-02-05', logs)).toEqual([{ n: 1, name: 'Foundation', badge: 'Legend', icon: '🏆' }]);
+  });
+});

@@ -1,6 +1,8 @@
 import { buildJourney, chapterSummaries, type ChapterSummary, type Milestone } from '@/domain/journey';
 import { computeMastery, perkById, type Perk, type TrackMastery } from '@/domain/mastery';
 import { computeMomentum, type Momentum } from '@/domain/momentum';
+import { validPicks } from '@/domain/perks';
+import { SEASON_DAYS, seasonFor, type SeasonState } from '@/domain/season';
 import { worldCollections, worldEvents, type Collection, type WorldEvent } from '@/domain/world';
 import { achievementRepository, metaRepository, playerRepository, questRepository, settingsRepository, statsRepository, tycoonRepository } from '@/repositories';
 import type { ActivityCategory, ISODate } from '@/types';
@@ -133,4 +135,24 @@ export async function loadWorldExtras(): Promise<{ events: WorldEvent[]; collect
     buildings,
   });
   return { events, collections: worldCollections({ buildings, cosmetics, mastery }) };
+}
+
+export async function getPerks(): Promise<string[]> {
+  return (await metaRepository.get<string[]>('perks')) ?? [];
+}
+
+/** Save perk picks (validated against the level's slots). Free to change any time. */
+export async function setPerks(ids: string[]): Promise<string[]> {
+  const player = await playerRepository.get();
+  const valid = validPicks(ids, player?.level ?? 1);
+  await metaRepository.set('perks', valid);
+  return valid;
+}
+
+export async function loadSeason(): Promise<SeasonState | undefined> {
+  const start = await metaRepository.get<ISODate>('adventureStart');
+  if (!start) return undefined;
+  const today = clock.today();
+  const logs = await statsRepository.logs(shiftDate(today, -SEASON_DAYS), today);
+  return seasonFor(start, today, logs);
 }

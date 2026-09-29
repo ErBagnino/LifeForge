@@ -28,7 +28,7 @@ import { SuggestionCards } from './SuggestionCards';
 import { Timeline } from './Timeline';
 import { RightNowCard, useRightNow } from './RightNowCard';
 import { DayJourney } from './DayJourney';
-import { NextUnlockCard, OneMoreThingCard, ProgressStrip, WorldPreview } from './HomeModules';
+import { DayCompleteMoment, NextUnlockCard, OneMoreThingCard, ProgressStrip, SeasonCard, WeekCompleteMoment, WorldPreview } from './HomeModules';
 import { WorkNudge } from './WorkNudge';
 import { NutritionGlance, StatsGlance } from './TodayExtras';
 import { DailyOpeningCard } from './context/DailyOpeningCard';
@@ -297,7 +297,10 @@ export default function TodayScreen() {
           {/* PROGRESS & WORLD */}
           <HomeSection>Progress</HomeSection>
           <NextUnlockCard />
+          <SeasonCard />
           <WorldPreview />
+          <DayCompleteMoment />
+          <WeekCompleteMoment />
 
           {/* OPTIONAL — collapsed */}
           {((view === 'list' && groups.side.length > 0) || settings.leisure.enabled) && (
