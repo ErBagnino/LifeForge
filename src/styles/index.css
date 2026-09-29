@@ -234,6 +234,13 @@ html.kb-open .hide-on-kb {
   animation: lf-heartbeat 1.2s ease-in-out infinite;
   display: inline-block;
 }
+@keyframes lf-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.lf-bob {
+  animation: lf-bob 2.4s ease-in-out infinite;
+}
 /* A hot streak flickers faster. */
 .lf-flame-hot {
   animation-duration: 0.8s;
@@ -241,12 +248,14 @@ html.kb-open .hide-on-kb {
 @media (prefers-reduced-motion: reduce) {
   .lf-flame,
   .lf-pulse,
+  .lf-bob,
   .lf-skeleton {
     animation: none;
   }
 }
 .reduce-motion .lf-flame,
 .reduce-motion .lf-pulse,
+.reduce-motion .lf-bob,
 .reduce-motion .lf-skeleton {
   animation: none;
 }

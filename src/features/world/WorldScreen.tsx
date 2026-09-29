@@ -1,47 +1,21 @@
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Card, Kpi, SectionTitle, cx } from '@/components/ui/primitives';
 import { CATEGORY_INFO } from '@/data/categories';
 import { buildBlockers, buildingCost, homeLevel, homeTitle, nextHomeTitle, worldBonuses } from '@/domain/tycoon';
 import { useAsync, useLevel, useNow } from '@/hooks';
-import { tycoonRepository } from '@/repositories';
+import { questRepository, tycoonRepository } from '@/repositories';
+import { clock } from '@/services/clock';
+import { shiftDate } from '@/utils/date';
 import { useGame } from '@/store/gameStore';
 import type { ActivityCategory, Building } from '@/types';
 import { formatInt } from '@/utils/format';
 import { loadWorldExtras } from '@/services/progressService';
 import { ProgressBar } from '@/components/ui/progress';
 import { BuildingSheet } from './BuildingSheet';
-import { RoomScene } from './RoomScene';
-
-function Blueprint({ b, level, coins, all, onClick }: { b: Building; level: number; coins: number; all: Building[]; onClick: () => void }) {
-  const blockers = buildBlockers(b, level, coins, all);
-  const lockedByLevel = blockers.find((x) => x.type === 'playerLevel');
-  const affordable = blockers.length === 0;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        'relative flex h-full w-full flex-col items-center justify-center border-2 border-dashed text-center',
-        affordable ? 'border-accent bg-accent/8' : 'border-fg/15 bg-[repeating-linear-gradient(45deg,transparent,transparent_8px,rgba(127,127,127,0.07)_8px,rgba(127,127,127,0.07)_16px)]',
-      )}
-      aria-label={`${b.name}: ${affordable ? 'ready to build' : 'locked'}`}
-    >
-      <span className={cx('text-[30px]', !affordable && 'opacity-40 grayscale')}>{b.icon}</span>
-      <span className="text-[13px] font-bold">{b.name}</span>
-      <span className={cx('num text-[12px] font-semibold', affordable ? 'text-accent' : 'text-muted')}>
-        {lockedByLevel && lockedByLevel.type === 'playerLevel' ? `🔒 Level ${lockedByLevel.required}` : `${affordable ? '🔨' : '🔒'} ${formatInt(buildingCost(b, 1))} 🪙`}
-      </span>
-      {affordable && (
-        <motion.span className="absolute top-1.5 right-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-on-accent" animate={{ scale: [1, 1.12, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}>
-          BUILD
-        </motion.span>
-      )}
-    </button>
-  );
-}
+import { Diorama } from './Diorama';
 
 export default function WorldScreen() {
   const navigate = useNavigate();
@@ -55,17 +29,20 @@ export default function WorldScreen() {
   const { data: cosmetics } = useAsync(() => tycoonRepository.cosmetics.all(), []);
   const { data: extras } = useAsync(() => loadWorldExtras(), []);
   const [openSet, setOpenSet] = useState<string | null>(null);
+  const petEmoji = useGame((s) => s.settings?.profile.petEmoji);
+  // Rooms light up when this week's real completions belong to their life area.
+  const { data: activity } = useAsync(async () => {
+    const today = clock.today();
+    const quests = await questRepository.byRange(shiftDate(today, -6), today);
+    const out: Record<string, number> = {};
+    for (const b of buildings) out[b.id] = quests.filter((q) => q.status === 'completed' && b.categories.includes(q.category)).length;
+    return out;
+  }, [buildings]);
 
   useEffect(() => {
     const room = params.get('room');
     if (room) setSelected(buildings.find((b) => b.id === room) ?? null);
   }, [params, buildings]);
-
-  const floors = useMemo(() => {
-    const map = new Map<number, Building[]>();
-    for (const b of buildings) map.set(b.floor, [...(map.get(b.floor) ?? []), b]);
-    return [...map.entries()].sort((a, b) => b[0] - a[0]);
-  }, [buildings]);
 
   if (!player) return null;
   const hl = homeLevel(buildings);
@@ -74,8 +51,6 @@ export default function WorldScreen() {
   const deco = cosmetics ?? [];
   const cheapDeco = deco.find((c) => c.type === 'decoration' && !c.owned && c.price <= player.coins && buildings.find((b) => b.id === c.room)?.level);
   const sky = hour >= 6 && hour < 17 ? 'linear-gradient(#7cc8ff, #cdeeff)' : hour >= 17 && hour < 20 ? 'linear-gradient(#ff8a5b, #ffd29a)' : 'linear-gradient(#0f1330, #28295e)';
-  const bestRoom = buildings.filter((b) => b.level > 0).sort((a, b) => b.level - a.level)[0];
-  const eventRooms = new Set((extras?.events ?? []).map((e) => e.room).filter(Boolean));
   const festival = extras?.events.some((e) => e.id === 'lantern_festival');
 
   return (
@@ -128,7 +103,20 @@ export default function WorldScreen() {
         </div>
       )}
 
-      <div className="relative mt-4 overflow-hidden rounded-[28px] shadow-card" style={{ background: sky }}>
+      <div className="relative mt-4 overflow-hidden rounded-[28px] px-2 pt-6 pb-2 shadow-card" style={{ background: sky }}>
+        {hour >= 20 || hour < 6 ? (
+          <div className="pointer-events-none absolute inset-0 text-[10px] text-white/70" aria-hidden>
+            {['12% 8%', '30% 16%', '70% 6%', '85% 20%', '50% 10%'].map((p) => (
+              <span key={p} className="absolute" style={{ left: p.split(' ')[0], top: p.split(' ')[1] }}>
+                ✦
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="pointer-events-none absolute top-3 left-4 text-[24px]" aria-hidden>
+            ☁️
+          </div>
+        )}
         {festival && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-around text-[16px]" aria-hidden>
             {['🏮', '🏮', '🏮', '🏮'].map((l, i) => (
@@ -138,68 +126,8 @@ export default function WorldScreen() {
             ))}
           </div>
         )}
-        {hour >= 20 || hour < 6 ? (
-          <div className="pointer-events-none absolute inset-0 text-[10px] text-white/70">
-            {['12% 8%', '30% 20%', '70% 6%', '85% 25%', '50% 12%'].map((p) => (
-              <span key={p} className="absolute" style={{ left: p.split(' ')[0], top: p.split(' ')[1] }}>
-                ✦
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="pointer-events-none absolute top-3 left-4 text-[26px]">☁️</div>
-        )}
-        <div className="relative mx-auto flex w-[88%] flex-col items-center pt-6">
-          <div className="text-[20px]">🚩</div>
-          <div className="h-0 w-full border-x-[46px] border-b-[30px] border-x-transparent" style={{ borderBottomColor: 'color-mix(in srgb, var(--lf-accent) 80%, #000)' }} />
-        </div>
-        <div className="relative mx-auto w-[92%] overflow-hidden rounded-t-lg bg-[#8a7766] p-[5px] pb-0">
-          {floors
-            .filter(([f]) => f >= 0)
-            .map(([floor, rooms]) => (
-              <div key={floor} className="mb-[5px] grid grid-cols-2 gap-[5px]">
-                {rooms
-                  .sort((a, b) => (a.slot === 'left' ? -1 : b.slot === 'left' ? 1 : 0))
-                  .map((b) => (
-                    <div key={b.id} className={cx('h-[112px] overflow-hidden rounded-md bg-surface-2', b.slot === 'full' && 'col-span-2', b.level > 0 && eventRooms.has(b.id) && 'ring-2 ring-accent ring-offset-1 ring-offset-[#8a7766]')}>
-                      {b.level > 0 ? (
-                        <button type="button" className="relative block h-full w-full text-left" onClick={() => setSelected(b)} aria-label={`${b.name} level ${b.level}`}>
-                          <RoomScene building={b} decorations={deco} height={112} showAvatar={b.id === bestRoom?.id} avatar={player.avatar} hour={hour} />
-                          <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">
-                            {b.name} · {b.level}
-                          </span>
-                        </button>
-                      ) : (
-                        <Blueprint b={b} level={level} coins={player.coins} all={buildings} onClick={() => setSelected(b)} />
-                      )}
-                    </div>
-                  ))}
-              </div>
-            ))}
-        </div>
-        {floors
-          .filter(([f]) => f < 0)
-          .map(([floor, rooms]) => (
-            <div key={floor} className="relative">
-              {rooms.map((b) => (
-                <div key={b.id} className="h-[120px] overflow-hidden">
-                  {b.level > 0 ? (
-                    <button type="button" className="relative block h-full w-full" onClick={() => setSelected(b)} aria-label={`${b.name} level ${b.level}`}>
-                      <RoomScene building={b} decorations={deco} height={120} hour={hour} />
-                      <span className="absolute top-1.5 left-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold text-white">
-                        {b.name} · {b.level}
-                      </span>
-                    </button>
-                  ) : (
-                    <div className="h-full bg-[#7fcf6a]/60 p-2">
-                      <Blueprint b={b} level={level} coins={player.coins} all={buildings} onClick={() => setSelected(b)} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
-        <div className="h-3 bg-[#5aa04a]" />
+        <Diorama buildings={buildings} hour={hour} avatar={player.avatar} activity={activity ?? {}} petEmoji={petEmoji} onSelect={setSelected} />
+        <p className="px-2 pb-1 text-center text-[12px] font-semibold text-white/85 drop-shadow">Tap a room to step inside · rooms glow when your real-life quests feed them</p>
       </div>
 
       <SectionTitle>World bonuses</SectionTitle>

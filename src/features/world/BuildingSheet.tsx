@@ -9,6 +9,10 @@ import { useGame } from '@/store/gameStore';
 import type { Building, BuildingEffect } from '@/types';
 import { formatInt } from '@/utils/format';
 import { RoomScene } from './RoomScene';
+import { BuildingPreview } from './Diorama';
+import { questRepository } from '@/repositories';
+import { clock } from '@/services/clock';
+import { shiftDate } from '@/utils/date';
 
 export function describeEffect(e: BuildingEffect, level: number): string {
   const cats = 'categories' in e ? e.categories.map((c) => CATEGORY_INFO[c].label).join(', ') : '';
@@ -48,12 +52,43 @@ function Body({ id, onClose }: { id: string; onClose: () => void }) {
   const blockers = buildBlockers(b, level, player.coins, buildings);
   const cost = b.level < b.maxLevel ? buildingCost(b, b.level + 1) : 0;
   const maxed = b.level >= b.maxLevel;
+  const hour = new Date(clock.now()).getHours();
+  const { data: related } = useAsync(async () => {
+    const today = clock.today();
+    return (await questRepository.byRange(shiftDate(today, -6), today)).filter((q) => q.status === 'completed' && b.categories.includes(q.category)).length;
+  }, [id]);
 
   return (
     <div>
       <div className="overflow-hidden rounded-3xl shadow-card">
         <RoomScene building={b.level ? b : { ...b, level: 1 }} decorations={decos ?? []} height={170} showAvatar={b.level > 0} avatar={player.avatar} />
       </div>
+      {!maxed && (
+        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-1 rounded-3xl bg-surface-2 px-2 py-1" aria-label={`Level ${b.level} now, level ${b.level + 1} next`}>
+          <div className="text-center">
+            <BuildingPreview building={b} level={b.level} hour={hour} />
+            <div className="-mt-1 pb-1 text-[11px] font-bold text-muted">{b.level ? `NOW · Lv ${b.level}` : 'NOW · empty lot'}</div>
+          </div>
+          <span className="text-[20px] text-accent" aria-hidden>
+            →
+          </span>
+          <div className="text-center">
+            <BuildingPreview building={b} level={b.level + 1} hour={hour} />
+            <div className="-mt-1 pb-1 text-[11px] font-bold text-accent">NEXT · Lv {b.level + 1}</div>
+          </div>
+        </div>
+      )}
+      {related !== undefined && (
+        <p className="mt-3 rounded-2xl bg-accent/8 px-3 py-2 text-[13px]">
+          {related > 0 ? (
+            <>
+              <b>{related}</b> {related === 1 ? 'quest' : 'quests'} for {b.lifeArea.toLowerCase()} this week are feeding this room.
+            </>
+          ) : (
+            <>Real {b.lifeArea.toLowerCase()} quests earn the coins that build this room — and its bonus makes them worth more.</>
+          )}
+        </p>
+      )}
       <p className="mt-3 text-[15px]">{b.description}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <Chip>{b.lifeArea}</Chip>
