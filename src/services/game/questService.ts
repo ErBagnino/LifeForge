@@ -97,8 +97,9 @@ export async function applyCompletion(tx: GameTx, quest: Quest, actualTime?: Tim
   tx.events.push({
     type: 'questComplete',
     questId: done.id,
-    title: done.hidden ? `Hidden: ${done.title}` : done.title,
-    icon: done.icon,
+    // Private quests never show their title in celebrations (someone may be looking at the screen).
+    title: done.private ? 'Private check-in' : done.hidden ? `Hidden: ${done.title}` : done.title,
+    icon: done.private ? '🛡️' : done.icon,
     kind: done.kind,
     rarity: done.rarity,
     xp: reward.xp,

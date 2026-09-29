@@ -83,13 +83,13 @@ function TodayTab() {
   return (
     <>
       {next && (
-        <button type="button" onClick={() => actions.start(next.quest, openMetric)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[22px] bg-accent px-4 py-3 text-left text-on-accent shadow-raised" aria-label={`Start next quest: ${resolveText(next.quest.title, pet)}`}>
+        <button type="button" onClick={() => actions.start(next.quest, openMetric)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[22px] bg-accent px-4 py-3 text-left text-on-accent shadow-raised" aria-label={`Start next quest: ${next.quest.private ? 'Private check-in' : resolveText(next.quest.title, pet)}`}>
           <span className="text-[26px]" aria-hidden>
-            {next.quest.icon}
+            {next.quest.private ? '🛡️' : next.quest.icon}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[11px] font-extrabold tracking-[0.16em] opacity-85">NEXT QUEST</span>
-            <span className="block truncate text-[16px] font-bold">{resolveText(next.quest.title, pet)}</span>
+            <span className="block truncate text-[16px] font-bold">{next.quest.private ? 'Private check-in' : resolveText(next.quest.title, pet)}</span>
           </span>
           <span className="num shrink-0 rounded-full bg-black/15 px-3 py-1.5 text-[13px] font-extrabold">{next.quest.kind === 'workout' ? 'START' : next.quest.metric ? 'LOG' : 'DONE'}</span>
         </button>

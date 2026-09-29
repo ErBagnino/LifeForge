@@ -288,6 +288,8 @@ export function Diorama({ buildings, hour, avatar, activity, petEmoji, onSelect 
               className="cursor-pointer outline-none focus-visible:[&>g]:opacity-90"
               style={{ transform: lifted === b.id ? 'translateY(-6px)' : undefined, transition: 'transform 140ms cubic-bezier(0.22,1,0.36,1)' }}
             >
+              {/* generous invisible hit area: the tile plus the building standing on it */}
+              <rect x={x - W / 4} y={y - 40} width={W / 2} height={52} fill="transparent" />
               <Tile col={col} row={row} built={b.level > 0} glow={glow} dim={dim} />
               <BuildingModel b={b} x={x} y={y + 2} light={light} dim={dim} building={!!constructing[b.id]} />
               {b.id === 'pet_corner' && b.level > 0 && petEmoji && (

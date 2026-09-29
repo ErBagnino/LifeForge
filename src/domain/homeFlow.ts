@@ -1,7 +1,7 @@
 import type { Achievement, Activity, Building, Quest } from '@/types';
 import { conditionProgress, type Counters } from './achievements';
 import type { ContextState } from './dailyContext';
-import { buildingCost } from './tycoon';
+import { buildBlockers, buildingCost } from './tycoon';
 
 /**
  * Home flow: the pieces that make the Home read as one path through the day —
@@ -110,7 +110,8 @@ export function nextUnlocks(i: UnlockInput): Unlock[] {
   const text = i.text ?? ((s: string) => s);
   if (i.level < i.maxLevel) out.push({ kind: 'level', icon: '⭐', title: `Reach level ${i.level + 1}`, remaining: `${Math.max(0, Math.round(i.xpNeeded - i.xpInto)).toLocaleString('en-US')} XP`, progress: i.xpNeeded > 0 ? i.xpInto / i.xpNeeded : 1, to: '/profile' });
   const candidates = i.buildings
-    .filter((b) => b.level < b.maxLevel && b.unlockLevel <= i.level)
+    // Same rules as building: player level for that level and prerequisite rooms (coins aside).
+    .filter((b) => buildBlockers(b, i.level, Number.POSITIVE_INFINITY, i.buildings).length === 0)
     .map((b) => ({ b, cost: buildingCost(b, b.level + 1) }))
     .sort((a, c) => a.cost - c.cost);
   const room = candidates[0];
@@ -145,7 +146,7 @@ export function oneMoreThing(i: OneMoreInput): OneMore | undefined {
   const cap = Math.min(i.freeMinutes ?? 30, i.energy < 30 ? 10 : 30);
   if (cap < 5) return undefined;
   const pending = i.quests
-    .filter((q) => q.status === 'pending' && !q.hidden && !q.goal && !q.metric && q.tier === 'optional' && q.durationMin <= cap && (!q.snoozedUntil || q.snoozedUntil <= i.now))
+    .filter((q) => q.status === 'pending' && !q.hidden && !q.private && !q.goal && !q.metric && q.tier === 'optional' && q.durationMin <= cap && (!q.snoozedUntil || q.snoozedUntil <= i.now))
     .sort((a, b) => a.durationMin - b.durationMin || b.xp - a.xp);
   if (pending[0]) return { kind: 'quest', quest: pending[0] };
   const today = new Set(i.quests.map((q) => q.activityId).filter(Boolean));

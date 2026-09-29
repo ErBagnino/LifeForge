@@ -25,7 +25,7 @@ describe('day journey', () => {
 });
 
 describe('next unlocks', () => {
-  const b = (id: string, level: number, baseCost: number, unlockLevel = 1) => ({ id, name: id, icon: '🏠', level, maxLevel: 5, baseCost, costGrowth: 2, unlockLevel }) as unknown as Building;
+  const b = (id: string, level: number, baseCost: number, unlockLevel = 1) => ({ id, name: id, icon: '🏠', level, maxLevel: 5, baseCost, costGrowth: 2, unlockLevel, requires: [] }) as unknown as Building;
   it('real amounts for level, cheapest available room and the closest badge', () => {
     const u = nextUnlocks({
       level: 3, xpInto: 50, xpNeeded: 200, maxLevel: 200, coins: 120,
@@ -42,6 +42,13 @@ describe('next unlocks', () => {
     expect(u[1]).toMatchObject({ title: 'lamp Lv.1', remaining: '30 🪙' }); // vault needs level 15
     expect(u[2]).toMatchObject({ title: 'Badge: Close', remaining: '8/10' });
   });
+  it('follows the real build rules: per-level player level and prerequisite rooms', () => {
+    const needsGym = { ...b('library', 0, 50), requires: [{ buildingId: 'gym', level: 2 }] } as unknown as Building;
+    const u = nextUnlocks({ level: 3, xpInto: 0, xpNeeded: 100, maxLevel: 200, coins: 0, buildings: [b('gym', 1, 500), needsGym, b('lamp', 0, 150)], achievements: [], counters: {} });
+    // gym Lv2 needs player level 4; library needs the gym at Lv2 → only the lamp qualifies
+    expect(u.find((x) => x.kind === 'building')?.title).toBe('lamp Lv.1');
+  });
+
   it('says "ready to build" when affordable, and skips badges with no progress', () => {
     const u = nextUnlocks({ level: 200, xpInto: 0, xpNeeded: 0, maxLevel: 200, coins: 1000, buildings: [b('lamp', 0, 150)], achievements: [{ id: 'a', name: 'X', icon: 'x', hidden: false, condition: { type: 'counter', key: 'q', gte: 10 } }] as never, counters: {} });
     expect(u.map((x) => x.kind)).toEqual(['building']);

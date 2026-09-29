@@ -93,6 +93,7 @@ export function RightNowCard({ onStart, onOpen, pick, override }: { onStart: (q:
   if (!pick) return null;
   const q = pick.quest;
   const pet = settings.profile.petName;
+  const title = q.private ? 'Private check-in' : resolveText(q.title, pet);
   const cat = CATEGORY_INFO[q.category];
   const verb = q.kind === 'workout' ? 'START' : q.metric ? 'LOG' : 'DONE';
   return (
@@ -110,12 +111,12 @@ export function RightNowCard({ onStart, onOpen, pick, override }: { onStart: (q:
         <span className="text-[12px] font-extrabold tracking-[0.18em] opacity-90">RIGHT NOW</span>
         {context && context.view.availableMin > 0 && <span className="num rounded-full bg-black/15 px-2 py-0.5 text-[11px] font-bold">{formatDuration(context.view.availableMin)} free today</span>}
       </div>
-      <button type="button" className="mt-3 flex w-full items-center gap-3.5 text-left" onClick={() => onOpen(q)} aria-label={`${resolveText(q.title, pet)}: details`}>
+      <button type="button" className="mt-3 flex w-full items-center gap-3.5 text-left" onClick={() => onOpen(q)} aria-label={`${title}: details`}>
         <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[18px] bg-white/20 text-[30px] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_14px_-6px_rgba(0,0,0,0.35)]" aria-hidden>
-          {q.icon}
+          {q.private ? '🛡️' : q.icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[21px] leading-tight font-extrabold [overflow-wrap:anywhere]">{resolveText(q.title, pet)}</span>
+          <span className="block text-[21px] leading-tight font-extrabold [overflow-wrap:anywhere]">{title}</span>
           <span className="mt-0.5 block text-[13px] font-medium opacity-90">
             {q.durationMin > 1 ? `~${q.durationMin} min · ` : ''}
             {cat.label}

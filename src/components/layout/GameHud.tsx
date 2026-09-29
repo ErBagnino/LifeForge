@@ -63,7 +63,7 @@ export function GameHud() {
           <button type="button" onClick={() => openAsk()} aria-label="Ask LifeForge" data-tour="ask" className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/12 text-accent">
             <Icon name="mic" size={20} />
           </button>
-          <button type="button" onClick={() => navigate('/stats')} aria-label="Stats" data-tour="stats" className="flex h-11 w-9 items-center justify-center rounded-full text-muted">
+          <button type="button" onClick={() => navigate('/stats')} aria-label="Stats" data-tour="stats" className="hit-44 flex h-11 w-9 items-center justify-center rounded-full text-muted">
             <Icon name="stats" size={19} />
           </button>
         </div>

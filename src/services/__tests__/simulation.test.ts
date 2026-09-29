@@ -54,13 +54,13 @@ describe('long-run simulation', () => {
     expect(await metaRepository.get('currentDate')).toBe(day1);
   });
 
-  // The full year takes minutes; `SIM_YEAR=1 npx vitest run simulation` runs it, the default run covers 60 days.
+  // The full year takes minutes; `SIM_YEAR=1 npx vitest run simulation` runs it, the default run covers 90 days.
   const year = !!(globalThis as unknown as { process?: { env: Record<string, string | undefined> } }).process?.env.SIM_YEAR;
-  it(`economy over ${year ? 'a year' : '60 days'}: steady progression, no runaway inflation`, async () => {
+  it(`economy over ${year ? 'a year' : '90 days'}: steady progression, no runaway inflation`, async () => {
     await freshWorld('2026-01-05T08:30:00');
     const rand = rng(7);
     const marks: Record<number, Awaited<ReturnType<typeof snapshot>>> = {};
-    const checkpoints = year ? [7, 30, 90, 180, 365] : [7, 30, 60];
+    const checkpoints = year ? [7, 30, 90, 180, 365] : [7, 30, 60, 90];
     const last = checkpoints[checkpoints.length - 1];
     const violations: string[] = [];
     for (let d = 1; d <= last; d++) {

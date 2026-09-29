@@ -79,7 +79,8 @@ export const QuestCard = memo(function QuestCard({
   const done = q.status === 'completed';
   const inactive = done || q.status === 'failed' || q.status === 'skipped';
   const hiddenUnrevealed = q.hidden && !done;
-  const title = hiddenUnrevealed ? '??? Hidden quest' : resolveText(q.title, petName);
+  // Compact rows live on the Home screen: private quests stay discreet there (full title in the quest sheet).
+  const title = hiddenUnrevealed ? '??? Hidden quest' : row && q.private ? 'Private check-in' : resolveText(q.title, petName);
   const snoozed = q.snoozedUntil && q.snoozedUntil > now;
   const progressLabel = questProgressLabel(q);
   const ratio = q.target ? (q.metricMode === 'atMost' ? q.progress / q.target : q.progress / q.target) : 0;
@@ -93,10 +94,10 @@ export const QuestCard = memo(function QuestCard({
       style={!row && q.rarity !== 'common' && !inactive ? { boxShadow: `inset 0 0 0 1.5px ${RARITY_INFO[q.rarity].color}55, var(--lf-shadow)` } : undefined}
     >
       <CheckButton q={q} onPress={onPress} />
-      <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen} aria-label={`Open ${title}`}>
+      <button type="button" className="min-h-11 min-w-0 flex-1 text-left" onClick={onOpen} aria-label={`Open ${title}`}>
         <div className="flex items-center gap-1.5">
           <span className="text-[17px] leading-none" aria-hidden>
-            {hiddenUnrevealed ? '❔' : q.icon}
+            {hiddenUnrevealed ? '❔' : row && q.private ? '🛡️' : q.icon}
           </span>
           <span className={cx('truncate font-semibold', row ? 'text-[15px]' : 'text-[15.5px]', done && 'line-through decoration-2')}>{title}</span>
         </div>

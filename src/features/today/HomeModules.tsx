@@ -17,7 +17,7 @@ import { resolveText } from '@/services/game/questFactory';
 import { startActivityNow } from '@/services/game/questService';
 import { useGame } from '@/store/gameStore';
 import type { Quest } from '@/types';
-import { buildingCost } from '@/domain/tycoon';
+import { buildBlockers, buildingCost } from '@/domain/tycoon';
 import { RoomScene } from '../world/RoomScene';
 import { ScoreCard } from './ScoreCard';
 
@@ -149,9 +149,8 @@ export function WorldPreview() {
   const built = buildings.filter((b) => b.level > 0).sort((a, b) => b.level - a.level);
   const best = built[0];
   const affordable = buildings
-    .filter((b) => b.level < b.maxLevel && b.unlockLevel <= level)
+    .filter((b) => buildBlockers(b, level, player.coins, buildings).length === 0)
     .map((b) => ({ b, cost: buildingCostOf(b) }))
-    .filter((x) => x.cost <= player.coins)
     .sort((a, b) => a.cost - b.cost)[0];
   return (
     <button type="button" onClick={() => navigate(affordable ? `/world?room=${affordable.b.id}` : '/world')} className="mt-3 block w-full overflow-hidden rounded-[24px] bg-surface text-left shadow-card" aria-label={affordable ? `You can build: ${affordable.b.name}` : 'Open your world'}>
