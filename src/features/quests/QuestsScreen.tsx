@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useRightNow } from '../today/RightNowCard';
 import { useNavigate } from 'react-router';
 import { Screen } from '@/components/layout/Screen';
 import { Field, Segmented, Select, TextInput, NumberInput } from '@/components/ui/forms';
@@ -64,6 +65,7 @@ function TodayTab() {
   const [quick, setQuick] = useState<{ open: boolean; tab: QuickTab }>({ open: false, tab: 'water' });
   const [manual, setManual] = useState(false);
   const [draft, setDraft] = useState({ title: '', icon: '✨', category: 'general' as ActivityCategory, difficulty: 2 as Difficulty, durationMin: 15 });
+  const next = useRightNow();
   if (!today) return null;
   const openMetric = (q: Quest) => setQuick({ open: true, tab: metricToTab(q.metric) });
   const list = (qs: Quest[]) => (
@@ -80,14 +82,26 @@ function TodayTab() {
 
   return (
     <>
+      {next && (
+        <button type="button" onClick={() => actions.start(next.quest, openMetric)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[22px] bg-accent px-4 py-3 text-left text-on-accent shadow-raised" aria-label={`Start next quest: ${resolveText(next.quest.title, pet)}`}>
+          <span className="text-[26px]" aria-hidden>
+            {next.quest.icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-extrabold tracking-[0.16em] opacity-85">NEXT QUEST</span>
+            <span className="block truncate text-[16px] font-bold">{resolveText(next.quest.title, pet)}</span>
+          </span>
+          <span className="num shrink-0 rounded-full bg-black/15 px-3 py-1.5 text-[13px] font-extrabold">{next.quest.kind === 'workout' ? 'START' : next.quest.metric ? 'LOG' : 'DONE'}</span>
+        </button>
+      )}
+      <SectionTitle>Scheduled</SectionTitle>
+      {list(scheduled)}
+      <SectionTitle action={<button type="button" className="hit-44 text-[14px] font-semibold text-accent" onClick={() => setManual(true)}>+ Custom</button>}>Side quests</SectionTitle>
+      {side.length ? list(side) : <Locked label="Side quests" level={FEATURE_LEVELS.sideQuests} current={level} fallback="No side quests today: workload or energy says protect the core." />}
       <SectionTitle>Daily challenge</SectionTitle>
       {challenge.length ? list(challenge) : <Locked label="Daily Challenge" level={FEATURE_LEVELS.challenge} current={level} fallback="No challenge today — the game decided you have enough on your plate." />}
       <SectionTitle>Hidden quest</SectionTitle>
       {hidden.length ? list(hidden) : <Locked label="Hidden quests" level={FEATURE_LEVELS.hidden} current={level} fallback="No secret today. Or is there…" />}
-      <SectionTitle action={<button type="button" className="hit-44 text-[14px] font-semibold text-accent" onClick={() => setManual(true)}>+ Custom</button>}>Side quests</SectionTitle>
-      {side.length ? list(side) : <Locked label="Side quests" level={FEATURE_LEVELS.sideQuests} current={level} fallback="No side quests today: workload or energy says protect the core." />}
-      <SectionTitle>Scheduled</SectionTitle>
-      {list(scheduled)}
 
       <QuestSheet quest={sheet ? (today.quests.find((q) => q.id === sheet.id) ?? sheet) : null} onClose={() => setSheet(null)} onMetric={openMetric} />
       <QuickLogSheet open={quick.open} tab={quick.tab} onClose={() => setQuick((q) => ({ ...q, open: false }))} />

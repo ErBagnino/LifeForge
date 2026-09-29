@@ -108,6 +108,9 @@ export default function WorkoutLogger() {
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [summary, setSummary] = useState<FinishSummary | null>(null);
   const [finishing, setFinishing] = useState(false);
+  // Focus mode: one exercise at a time (default). The full list is one tap away.
+  const [focus, setFocus] = useState(true);
+  const [cursor, setCursor] = useState<number | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { data: exercises } = useAsync(async () => new Map((await workoutRepository.exercises.all()).map((e) => [e.id, e])), [], { live: false });
 
@@ -151,38 +154,18 @@ export default function WorkoutLogger() {
     if (r.summary) setSummary(r.summary);
   };
 
-  return (
-    <div className="min-h-full pb-[calc(var(--safe-bottom)+110px)]">
-      <div className="sticky top-0 z-20 glass pt-safe">
-        <div className="flex h-14 items-center gap-2 px-safe">
-          <button type="button" className="-ml-2 flex h-11 w-11 items-center justify-center text-[16px] text-accent" aria-label="Quit workout" onClick={() => setConfirmQuit(true)}>
-            <Icon name="close" size={20} />
-          </button>
-          <div className="min-w-0 flex-1 text-center">
-            <div className="truncate text-[16px] font-bold">{session.name}</div>
-            <div className="num text-[12px] text-muted">
-              ⏱ {formatClock((now - session.startedAt) / 1000)} · {doneSets}/{totalSets} sets · {formatInt(volume)} kg
-            </div>
-          </div>
-          <Button size="sm" onClick={() => void finish()} loading={finishing} disabled={doneSets === 0}>
-            Finish
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-3 px-safe pt-3">
-        {session.exercises.map((ex, i) => {
+  const renderExercise = (ex: SessionExercise, i: number, big: boolean) => {
           const def = exercises.get(ex.exerciseId);
           const done = ex.sets.filter((s) => s.completed).length;
           return (
             <Card key={`${ex.exerciseId}${i}`} className="!p-3">
               <div className="flex items-center gap-3">
                 <button type="button" onClick={() => def && setInfo(def)} aria-label={`How to do ${def?.name}`} className="shrink-0 overflow-hidden rounded-2xl">
-                  <ExerciseIllustration illustration={def?.illustration ?? ''} muscles={def?.muscles} size={78} mode="end" />
+                  <ExerciseIllustration illustration={def?.illustration ?? ''} muscles={def?.muscles} size={big ? 132 : 78} mode={big ? 'animate' : 'end'} />
                 </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[16px] font-bold">{def?.name ?? ex.exerciseId}</span>
+                    <span className={big ? 'text-[20px] leading-tight font-extrabold' : 'truncate text-[16px] font-bold'}>{def?.name ?? ex.exerciseId}</span>
                     {done >= ex.targetSets && <span>✅</span>}
                   </div>
                   <div className="num text-[13px] text-muted">
@@ -223,7 +206,59 @@ export default function WorkoutLogger() {
               </div>
             </Card>
           );
-        })}
+  };
+
+  const firstOpen = session.exercises.findIndex((e) => e.sets.some((x) => !x.completed));
+  const current = Math.min(session.exercises.length - 1, Math.max(0, cursor ?? (firstOpen >= 0 ? firstOpen : 0)));
+
+  return (
+    <div className="min-h-full pb-[calc(var(--safe-bottom)+110px)]">
+      <div className="sticky top-0 z-20 glass pt-safe">
+        <div className="flex h-14 items-center gap-2 px-safe">
+          <button type="button" className="-ml-2 flex h-11 w-11 items-center justify-center text-[16px] text-accent" aria-label="Quit workout" onClick={() => setConfirmQuit(true)}>
+            <Icon name="close" size={20} />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <div className="truncate text-[16px] font-bold">{session.name}</div>
+            <div className="num text-[12px] text-muted">
+              ⏱ {formatClock((now - session.startedAt) / 1000)} · {doneSets}/{totalSets} sets · {formatInt(volume)} kg
+            </div>
+          </div>
+          <button type="button" onClick={() => setFocus((v) => !v)} aria-pressed={focus} className="hit-44 shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-[12px] font-semibold">
+            {focus ? 'List' : 'Focus'}
+          </button>
+          <Button size="sm" onClick={() => void finish()} loading={finishing} disabled={doneSets === 0}>
+            Finish
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3 px-safe pt-3">
+        {focus && session.exercises.length > 0 ? (
+          <>
+            <div className="flex items-center justify-center gap-1.5 pt-1" aria-label={`Exercise ${current + 1} of ${session.exercises.length}`}>
+              {session.exercises.map((e, k) => (
+                <button key={k} type="button" onClick={() => setCursor(k)} aria-label={`Go to exercise ${k + 1}`} className="hit-44 flex h-3 items-center">
+                  <span className={cx('block h-2 rounded-full transition-all', k === current ? 'w-6 bg-accent' : e.sets.every((x) => x.completed) ? 'w-2 bg-accent/50' : 'w-2 bg-surface-3')} />
+                </button>
+              ))}
+            </div>
+            {renderExercise(session.exercises[current], current, true)}
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" icon="chevronLeft" disabled={current === 0} onClick={() => setCursor(current - 1)} aria-label="Previous exercise">
+                Prev
+              </Button>
+              <div className="min-w-0 flex-1 truncate text-center text-[13px] text-muted">
+                {current < session.exercises.length - 1 ? <>Next: <span className="font-semibold text-fg">{exercises.get(session.exercises[current + 1].exerciseId)?.name ?? '—'}</span></> : 'Last exercise'}
+              </div>
+              <Button variant="secondary" disabled={current >= session.exercises.length - 1} onClick={() => setCursor(current + 1)} aria-label="Next exercise">
+                Next
+              </Button>
+            </div>
+          </>
+        ) : (
+          session.exercises.map((ex, i) => renderExercise(ex, i, false))
+        )}
         {!session.exercises.length && (
           <div className="rounded-3xl bg-surface px-5 py-6 text-center shadow-card">
             <div className="text-[36px]" aria-hidden>

@@ -76,23 +76,6 @@ export default function TrainScreen() {
           <div className="text-[14px] text-muted">
             {featured.exercises.length} exercises · ~{featured.estimatedMin} min · rest 60–120 s
           </div>
-          <div className="mt-3">
-            <MuscleMap muscles={muscles} height={150} showLegend={false} />
-          </div>
-          <div className="mt-3 space-y-1">
-            {featured.exercises.map((te) => {
-              const ex = exercises.get(te.exerciseId);
-              return (
-                <button key={te.exerciseId} type="button" onClick={() => navigate(`/train/exercise/${te.exerciseId}`)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-[14px] active:bg-surface-2">
-                  <span className="font-medium">{ex?.name ?? te.exerciseId}</span>
-                  <span className="num text-muted">
-                    {te.sets} × {te.repMin === te.repMax ? te.repMin : `${te.repMin}–${te.repMax}`}
-                    {ex?.measure === 'time' ? ' s' : ''}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
           <Button
             block
             size="lg"
@@ -103,6 +86,31 @@ export default function TrainScreen() {
           >
             {doneToday ? 'Train again (extra)' : todays ? 'START WORKOUT' : 'Start it today anyway'}
           </Button>
+          <div className="mt-3">
+            <MuscleMap muscles={muscles} height={150} showLegend={false} />
+          </div>
+          <details className="group mt-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[14px] font-semibold text-accent [&::-webkit-details-marker]:hidden">
+              <span>{featured.exercises.length} exercises</span>
+              <span className="transition-transform group-open:rotate-90" aria-hidden>
+                ›
+              </span>
+            </summary>
+            <div className="space-y-1">
+              {featured.exercises.map((te) => {
+                const ex = exercises.get(te.exerciseId);
+                return (
+                  <button key={te.exerciseId} type="button" onClick={() => navigate(`/train/exercise/${te.exerciseId}`)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-[14px] active:bg-surface-2">
+                    <span className="font-medium">{ex?.name ?? te.exerciseId}</span>
+                    <span className="num text-muted">
+                      {te.sets} × {te.repMin === te.repMax ? te.repMin : `${te.repMin}–${te.repMax}`}
+                      {ex?.measure === 'time' ? ' s' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </details>
         </Card>
       ) : (
         <EmptyState icon="📋" title="No workout plan" body="Create a plan to get scheduled workout quests." action={<Button onClick={() => navigate('/train/plan')}>Edit plan</Button>} />

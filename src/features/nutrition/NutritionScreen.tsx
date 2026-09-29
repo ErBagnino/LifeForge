@@ -213,9 +213,11 @@ export default function NutritionScreen() {
         </div>
       </Card>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <ActionTile icon="plus" label="Add Food" onClick={() => setAdding(true)} />
-        <ActionTile icon="camera" label="Scan Food" primary tour="scan-food" onClick={() => navigate('/nutrition/scan')} />
+      <Button block size="lg" className="mt-3 shadow-raised" icon="plus" onClick={() => setAdding(true)}>
+        ADD FOOD
+      </Button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <ActionTile icon="camera" label="Scan Food" tour="scan-food" onClick={() => navigate('/nutrition/scan')} />
         <ActionTile emoji="💧" label="Add Water" sub={`+${settings.hydration.glassMl} ml`} onClick={() => void act(logMetric('water', settings.hydration.glassMl))} />
       </div>
 

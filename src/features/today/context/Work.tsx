@@ -1,13 +1,13 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { Button, Card, cx } from '@/components/ui/primitives';
+import { Button, cx } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { expectedWork, formatDuration, type QuestDecision } from '@/domain/dailyContext';
 import { clock } from '@/services/clock';
 import { endWork, setNoWork, startWork } from '@/services/contextService';
 import { resolveText } from '@/services/game/questFactory';
 import { useGame } from '@/store/gameStore';
-import { tsToHm, weekday } from '@/utils/date';
+import { dateTimeToTs, tsToHm, weekday } from '@/utils/date';
 
 const PRIORITY_STYLE: Record<QuestDecision['priority'], string> = {
   CRITICAL: 'bg-danger/12 text-danger',
@@ -97,36 +97,41 @@ export function WorkStartCard() {
  */
 export function WorkModeView({ onEnd, onShowAll }: { onEnd: () => void; onShowAll: () => void }) {
   const context = useGame((s) => s.context);
+  const today = useGame((s) => s.today);
+  const dayStartHour = useGame((s) => s.settings?.dayStartHour ?? 4);
   const now = useTick(!!context?.openWork, 30_000);
-  if (!context?.openWork) return null;
+  if (!context?.openWork || !today) return null;
+  const start = context.openWork.start;
+  // Expected end: today's planned hours, else what the app has learned, else a plain 9 hours.
+  const plannedEnd = today.plan.work?.end ? dateTimeToTs(today.date, today.plan.work.end, dayStartHour) : undefined;
+  const learnedMin = expectedWork(context.learned, today.date)?.minutes ?? context.learned.work.avgMinutes;
+  const end = plannedEnd && plannedEnd > start ? plannedEnd : start + (learnedMin ?? 9 * 60) * 60_000;
+  const ratio = Math.min(1, Math.max(0, (now - start) / Math.max(1, end - start)));
   const remaining = context.view.decisions.filter((d) => d.priority !== 'OPTIONAL').length;
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
-      <Card className="py-6 text-center">
-        <div className="text-[12px] font-extrabold tracking-[0.18em] text-muted">WORK MODE</div>
-        <div className="mt-2 text-[44px]" aria-hidden>
-          💼
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
+      <section aria-label="Work mode" className="rounded-[28px] bg-surface px-5 py-7 text-center shadow-card">
+        <div className="text-[13px] font-extrabold tracking-[0.2em] text-muted">WORKING</div>
+        <div className="num mt-3 text-[30px] font-extrabold tracking-tight">
+          {tsToHm(start)} <span className="text-muted">→</span> {tsToHm(end)}
         </div>
-        <div className="text-[20px] font-bold">Working</div>
-        <dl className="num mx-auto mt-4 grid max-w-[300px] grid-cols-2 gap-2 text-[13px]">
-          <div className="rounded-2xl bg-surface-2 px-3 py-2">
-            <dt className="text-muted">Started</dt>
-            <dd className="text-[18px] font-bold">{tsToHm(context.openWork.start)}</dd>
+        <div className="mx-auto mt-4 max-w-[300px]">
+          <div className="h-3 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuenow={Math.round(ratio * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Workday progress">
+            <div className="h-full rounded-full bg-accent transition-[width] duration-700" style={{ width: `${ratio * 100}%` }} />
           </div>
-          <div className="rounded-2xl bg-surface-2 px-3 py-2">
-            <dt className="text-muted">Duration</dt>
-            <dd className="text-[18px] font-bold">{clockDuration(now - context.openWork.start)}</dd>
+          <div className="num mt-1.5 flex justify-between text-[12px] text-muted">
+            <span>{clockDuration(now - start)} in</span>
+            <span>{plannedEnd ? 'planned end' : 'usual end'}</span>
           </div>
-        </dl>
-        <p className="mt-3 text-[14px] text-muted">Today’s remaining objectives: {remaining}</p>
-        <p className="mx-auto mt-2 max-w-[280px] text-[15px] font-semibold">Focus on work. LifeForge will handle the rest later.</p>
-        <Button size="lg" variant="secondary" icon="stop" className="mt-5" onClick={onEnd}>
+        </div>
+        <Button size="lg" icon="stop" className="mt-6 min-w-[200px]" onClick={onEnd}>
           END WORK
         </Button>
-        <button type="button" onClick={onShowAll} className="mt-2 block min-h-11 w-full text-[13px] text-faint">
+        <p className="mt-4 text-[13px] text-muted">Quests are on hold · {remaining} left for later</p>
+        <button type="button" onClick={onShowAll} className="mt-1 block min-h-11 w-full text-[13px] text-faint">
           Show everything anyway
         </button>
-      </Card>
+      </section>
     </motion.div>
   );
 }
